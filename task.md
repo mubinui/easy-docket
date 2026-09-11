@@ -24,13 +24,13 @@ Every task follows the same loop, and none of it is optional:
 | Phase | Scope | State |
 | --- | --- | --- |
 | 1 | Core ledger | ✅ Done |
-| 2 | Budgets | 🔄 In progress — 2.1 done |
+| 2 | Budgets | 🔄 In progress — 2.1, 2.2 done |
 | 3 | Reports | ⬜ Planned |
 | 4 | Recurring transactions | ⬜ Planned |
 | 5 | Multi-currency | ⬜ Planned |
 | 6 | Release readiness | ⬜ Planned |
 
-Tests today: **107 client**, **84 Go**.
+Tests today: **167 client**, **84 Go**.
 
 ---
 
@@ -84,20 +84,41 @@ so the fix is structural: `ENTITY_NAMES` is now the single source of truth,
 envelope format or any of the three adapters — which is the property this task
 existed to verify.
 
-### 2.2 Budget calculations
+### 2.2 Budget calculations ✅
 
-- [ ] `BudgetsService` with live signals, mirroring `AccountsService`
-- [ ] Period resolution: which window a budget is in for a given date
-- [ ] Spend-per-budget from transactions in that window
-- [ ] Rollover: unspent amount carries into the next period when enabled
+- [x] `core/budgets/period.ts` — window resolution, pure
+- [x] `core/budgets/spend.ts` — spend, rollover, progress, stale references, pure
+- [x] `core/repositories/budgets.service.ts` — live signals over both
+- [x] Stale-category gap closed: surfaced via `needingAttention`, repaired by
+      `pruneStaleCategories`
 
-**Tests** — pure functions first, so the edge cases are cheap to state:
-- Weekly / monthly / yearly window boundaries, including month-length differences
-- A budget spanning a year boundary
-- Rollover accumulating across several periods, and not accumulating when off
-- Transfers excluded; only expenses count
-- A budget covering several categories sums them
-- Spend of zero, and spend exceeding the limit
+**Tests** (60 added, 107 → 167)
+- [x] `period.spec.ts` — weekly / monthly / yearly boundaries; start-day
+      anchoring; month-length clamping; 29 February starts; year crossings;
+      daylight saving; and a tiling check over 36 consecutive periods
+- [x] `spend.spec.ts` — expenses only, transfers and income excluded;
+      multi-category budgets; boundary days inclusive; rollover accumulating,
+      carrying deficits, and netting surplus against deficit; exhausted
+      allowance not dividing by zero
+- [x] `budgets.service.spec.ts` — validation, duplicate-category removal,
+      archive vs delete, stale-reference repair, live progress and urgency order
+
+**Decisions taken while building.**
+
+*Windows anchor to `startDate`, not the calendar.* A budget started on the 15th
+runs the 15th to the 14th, because that is what someone paid on the 15th means
+by "this month". Month-length clamping (a budget started on the 31st opening on
+28 February) lives in exactly one function, `windowStart`; every other boundary
+falls out of "a window ends the day before the next begins", so there is one
+place to be wrong rather than six.
+
+*Rollover carries overspend as well as surplus.* Forgiving an overspent month
+would make the setting flattering rather than useful. This is worth confirming
+with you if you would rather it floor at zero — it is a one-line change and a
+test.
+
+*`pruneStaleCategories` refuses to empty a budget.* Pruning the last category
+would leave a budget that silently tracks nothing, which is worse than an error.
 
 ### 2.3 Budget screens
 
@@ -223,7 +244,8 @@ Real, currently unaddressed, and each one has a home above.
 | No rate limiting on the server | A leaked token can be used to exhaust disk | Server hardening, unscheduled — quotas blunt it today |
 | Single currency assumed in UI totals | Dashboard uses the first account's currency | Phase 5 |
 | Category deletion leaves transactions uncategorised | Silent, no warning | Small fix, fold into 2.3 |
-| Deleting a category leaves it referenced in `Budget.categoryIds` | A budget silently stops counting that spend | 2.2 — resolve against live categories and surface stale references |
+| ~~Deleting a category leaves it referenced in `Budget.categoryIds`~~ | — | ✅ Closed in 2.2 |
+| `BudgetsService.statuses` reads the whole transaction table | Fine for a personal ledger, wrong for a large one | Unscheduled; revisit with reports (Phase 3), which needs windowed queries anyway |
 | Android build needs JDK 21 | JDK 25 is rejected by this Gradle | Documented in `docs/DEPLOYMENT.md`; revisit on Gradle upgrade |
 
 ---
