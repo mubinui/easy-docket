@@ -44,3 +44,36 @@ ion-item-divider {
   letter-spacing: 0.04em;
 }
 
+
+/**
+ * Chart palette.
+ *
+ * A small set of roles rather than raw hex at the call sites, so light and dark
+ * swap in one place. The two series hues are the reference data-viz palette's
+ * slots 1 and 2, validated against the surfaces they actually render on — the
+ * card background, not the page — in both modes: lightness band, chroma floor,
+ * colourblind separation (worst pair ΔE 24.7 light / 26.8 dark against a floor
+ * of 8), normal-vision separation, and 3:1 contrast.
+ *
+ * Chrome colours are deliberately recessive: hairline, solid, one step off the
+ * surface. The data is the only thing allowed to be loud.
+ */
+:root {
+  --viz-surface: var(--ion-card-background, #ffffff);
+  --viz-series-1: #2a78d6;
+  --viz-series-2: #eb6834;
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  --viz-muted: #898781;
+  --viz-ink-secondary: #52514e;
+}
+
+.ion-palette-dark {
+  --viz-surface: var(--ion-card-background, #1e1e1e);
+  --viz-series-1: #3987e5;
+  --viz-series-2: #d95926;
+  --viz-grid: #2c2c2a;
+  --viz-axis: #383835;
+  --viz-muted: #898781;
+  --viz-ink-secondary: #c3c2b7;
+}

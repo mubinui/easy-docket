@@ -25,12 +25,12 @@ Every task follows the same loop, and none of it is optional:
 | --- | --- | --- |
 | 1 | Core ledger | ✅ Done |
 | 2 | Budgets | ✅ Done |
-| 3 | Reports | 🔄 In progress — 3.1 done |
+| 3 | Reports | 🔄 In progress — 3.1, 3.2 done |
 | 4 | Recurring transactions | ⬜ Planned |
 | 5 | Multi-currency | ⬜ Planned |
 | 6 | Release readiness | 🔄 6.5 done |
 
-Tests today: **249 client unit**, **26 end-to-end**, **84 Go**.
+Tests today: **310 client unit**, **26 end-to-end**, **84 Go**.
 
 ---
 
@@ -227,16 +227,57 @@ the points shown are bounded by it.
 *Blank payees are dropped from `topPayees`.* Lumping every unnamed expense under
 `""` would invent a merchant that dwarfs the real ones.
 
-### 3.2 Charts
-- [ ] Inline SVG chart components — donut, bar, line
+### 3.2 Charts ✅
 
-**Decision, made now to avoid churn later:** no chart library. The CDN is not
-reachable offline, a bundled library is heavy for four chart types, and inline
-SVG themes correctly in dark mode with the tokens already defined. Revisit only
-if a chart needs real interaction.
+- [x] `core/reports/geometry.ts` — pure layout: `niceAxis`, `scale`,
+      `horizontalBars`, `groupedColumns`, `linePoints`, `linePath`, `areaPath`,
+      `barPath`, `nearestIndex`
+- [x] `shared/charts/` — category bars, grouped flow columns, trend line
+- [x] Validated palette in `global.scss` as `--viz-*` roles, light and dark
+- [x] `chart-preview.spec.ts` — renders every chart in both themes to a
+      standalone page (`CHART_CAPTURE=/tmp/charts.html npm run test:ci`); a
+      no-op without the variable
 
-**Tests** — geometry from known inputs (path data, bar heights), empty series,
-single-point series, all-zero series.
+**Forms chosen, and why not the obvious ones.**
+
+*Bars, not a donut, for category spend.* The reader's job is ranking
+magnitudes, and a donut makes close values nearly impossible to order. Long
+category names also fit a horizontal layout, which matters on a phone.
+
+*One colour for every category bar.* Categories have no natural order, so
+shading them by size would double-encode the length the bar already shows and
+spend the only free channel on information the chart is not short of.
+
+*Grouped, not stacked, for income against expense.* They are not parts of a
+whole; stacking would imply a total that means nothing. One axis, never two — a
+second scale lets a chart invent a relationship the data does not contain.
+
+*No legend on the net-worth line.* One series, so the card title already says
+what is plotted; a box with a single swatch would only restate it.
+
+**Colour was computed, not judged.** The two series hues are the reference
+palette's slots 1 and 2, run through the validator against the surfaces the
+charts actually render on — the card background, not the page — in both modes.
+All six checks pass: worst-pair colourblind separation ΔE 24.7 light / 26.8 dark
+against a floor of 8, and 3:1 contrast throughout.
+
+**Tests** (61 added, 249 → 310)
+- [x] Geometry: axis rounding to readable ticks, always including zero, negative
+      domains, flat and empty series, bars scaled against the largest value,
+      columns anchored to the baseline and capped in thickness, a lone reading
+      placed mid-plot, path strings from known points, nearest-point lookup
+- [x] Components: shapes reach the DOM, every value has a table twin, empty
+      states say so rather than rendering a blank box, the legend is present for
+      two series and absent for one, gridlines are solid, a zero rule appears
+      only when data goes negative
+
+**What looking at it found.** Two things no assertion had caught: the bars were
+rounded at *both* ends, where the spec calls for a rounded data end and a square
+baseline (a pill floating free of the axis loses the anchor that makes lengths
+comparable), and category labels used the muted axis token, which sits around
+2.9:1 on white. Both fixed — `barPath` draws the shape explicitly, and labels
+now use a secondary-ink token. Worth repeating the lesson: the validator checks
+colour, the tests check geometry, and neither of them can see the chart.
 
 ### 3.3 Reports screen
 - [ ] Range picker, chart selection, per-category drill-down
