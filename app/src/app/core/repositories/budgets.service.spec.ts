@@ -170,6 +170,14 @@ describe('BudgetsService', () => {
       expect(budgets.needingAttention()[0].staleCategoryIds).toEqual(['cat-gone']);
     });
 
+    it('lists budgets by name, without needing an index on it', async () => {
+      await budgets.save(aBudget({ id: 'bud-z', name: 'Zoo trips' }));
+      await budgets.save(aBudget({ id: 'bud-a', name: 'Apples' }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(budgets.all().map((b) => b.name)).toEqual(['Apples', 'Zoo trips']);
+    });
+
     it('excludes archived budgets', async () => {
       await budgets.save(aBudget({ startDate: thisMonth, archived: true }));
       await new Promise((resolve) => setTimeout(resolve, 50));

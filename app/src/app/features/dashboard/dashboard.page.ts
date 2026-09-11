@@ -1,8 +1,14 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { addIcons } from 'ionicons';
-import { arrowDownOutline, arrowUpOutline, cloudOfflineOutline } from 'ionicons/icons';
+import {
+  arrowDownOutline,
+  arrowUpOutline,
+  chevronForwardOutline,
+  cloudOfflineOutline,
+} from 'ionicons/icons';
 import { AccountsService } from '../../core/repositories/accounts.service';
+import { BudgetsService } from '../../core/repositories/budgets.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
 import { TransactionsService } from '../../core/repositories/transactions.service';
 import { SyncSchedulerService } from '../../core/sync/sync-scheduler.service';
@@ -148,6 +154,29 @@ import {
 
       <ion-card>
         <ion-card-header>
+          <ion-card-title>Budgets</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-list lines="none">
+            <ion-item button [routerLink]="['/budgets']" detail="true">
+              <ion-label>
+                @if (budgetCount()) {
+                  <h3>{{ budgetCount() }} active</h3>
+                  <p>
+                    {{ overspentCount() ? overspentCount() + ' over budget' : 'All within limit' }}
+                  </p>
+                } @else {
+                  <h3>Set a spending limit</h3>
+                  <p>Track a category against a monthly or weekly budget</p>
+                }
+              </ion-label>
+            </ion-item>
+          </ion-list>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card>
+        <ion-card-header>
           <ion-card-title>Recent activity</ion-card-title>
         </ion-card-header>
         <ion-card-content>
@@ -180,12 +209,18 @@ export class DashboardPage {
   readonly accounts = inject(AccountsService);
   readonly categories = inject(CategoriesService);
   readonly transactions = inject(TransactionsService);
+  readonly budgets = inject(BudgetsService);
   private readonly scheduler = inject(SyncSchedulerService);
 
   /** The currency of the first account; a multi-currency ledger is out of scope for now. */
   readonly currency = computed(() => this.accounts.active()[0]?.currency ?? 'USD');
 
   readonly recent = computed(() => this.transactions.visible().slice(0, 5));
+
+  // Task 2.4 turns this into a card showing the budgets nearest their limit;
+  // for now the Summary screen just has to be able to reach the budgets page.
+  readonly budgetCount = computed(() => this.budgets.statuses().length);
+  readonly overspentCount = computed(() => this.budgets.overspent().length);
 
   /** Top five spending categories, with each one's share of the largest. */
   readonly topCategories = computed(() => {
@@ -209,6 +244,6 @@ export class DashboardPage {
   }
 
   constructor() {
-    addIcons({ arrowDownOutline, arrowUpOutline, cloudOfflineOutline });
+    addIcons({ arrowDownOutline, arrowUpOutline, chevronForwardOutline, cloudOfflineOutline });
   }
 }

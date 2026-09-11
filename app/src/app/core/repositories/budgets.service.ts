@@ -30,9 +30,19 @@ export class BudgetsService {
   private readonly db: DocketDb = inject(DOCKET_DB);
   private readonly ledger = inject(LedgerService);
 
-  readonly all = toSignal(from(liveQuery(() => this.db.budgets.orderBy('name').toArray())), {
-    initialValue: [] as Budget[],
-  });
+  /**
+   * Sorted in memory rather than by index. A ledger has tens of budgets, not
+   * thousands, so an index on `name` would buy nothing and would tie display
+   * order to the schema — meaning a future reorder needed a migration.
+   */
+  readonly all = toSignal(
+    from(
+      liveQuery(async () =>
+        (await this.db.budgets.toArray()).sort((a, b) => a.name.localeCompare(b.name)),
+      ),
+    ),
+    { initialValue: [] as Budget[] },
+  );
 
   readonly active = computed(() => this.all().filter((budget) => !budget.archived));
 

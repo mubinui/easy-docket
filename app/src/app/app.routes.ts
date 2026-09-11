@@ -41,6 +41,13 @@ export const routes: Routes = [
     ],
   },
   {
+    // Reached from the Summary screen rather than the tab bar: four tabs stay
+    // uncluttered, and budgets are a glance-then-leave screen.
+    path: 'budgets',
+    canActivate: [vaultGuard],
+    loadComponent: () => import('./features/budgets/budgets.page').then((m) => m.BudgetsPage),
+  },
+  {
     path: 'settings/sync',
     canActivate: [vaultGuard],
     loadComponent: () =>

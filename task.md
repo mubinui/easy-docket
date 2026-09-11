@@ -24,13 +24,13 @@ Every task follows the same loop, and none of it is optional:
 | Phase | Scope | State |
 | --- | --- | --- |
 | 1 | Core ledger | ✅ Done |
-| 2 | Budgets | 🔄 In progress — 2.1, 2.2 done |
+| 2 | Budgets | 🔄 In progress — 2.1–2.3 done |
 | 3 | Reports | ⬜ Planned |
 | 4 | Recurring transactions | ⬜ Planned |
 | 5 | Multi-currency | ⬜ Planned |
 | 6 | Release readiness | ⬜ Planned |
 
-Tests today: **167 client**, **84 Go**.
+Tests today: **192 client**, **84 Go**.
 
 ---
 
@@ -120,22 +120,49 @@ test.
 *`pruneStaleCategories` refuses to empty a budget.* Pruning the last category
 would leave a budget that silently tracks nothing, which is worse than an error.
 
-### 2.3 Budget screens
+### 2.3 Budget screens ✅
 
-- [ ] `features/budgets/budgets.page.ts` — list with progress bars, over-budget state
-- [ ] `features/budgets/budget-editor.component.ts` — create/edit/delete
-- [ ] Route + tab (five tabs, or move Settings behind an overflow — decide when building)
+- [x] `features/budgets/budgets.page.ts` — list, progress bars, over-budget
+      state, archived section, stale-category repair
+- [x] `features/budgets/budget-editor.component.ts` — create / edit / archive /
+      delete, expense categories only
+- [x] Route `/budgets`, reached from the Summary screen
 
-**Tests**
-- Editor validation: amount required and positive, at least one category
-- Deleting a budget leaves its transactions untouched
+**Navigation decided:** four tabs kept; Budgets is reached from a Summary card.
+The tab bar stays uncluttered and budgets remain a glance-then-leave screen.
 
-### 2.4 Dashboard integration
+**Tests** (25 added, 167 → 192)
+- [x] Editor: name / amount / category all required, whitespace-only name
+      rejected, non-positive and unparsable amounts reported rather than saved,
+      minor-unit conversion, edit-in-place, income categories not offered,
+      start-date hint wording
+- [x] Page: empty state, progress rendering, urgency order, over-budget in the
+      danger colour, archived separated, stale-category warning and repair,
+      repair not opening the editor behind it, archive from the editor
+- [x] Verified in a real browser: budget created from Summary, `$0.00 of
+      $250.00` becoming `$150.00 left` after a $100 expense, no page errors
 
-- [ ] Budget summary card: the closest-to-limit budgets, with remaining amounts
-- [ ] Empty state that points at budget creation
+**What it found.** `BudgetsService.all` sorted with `orderBy('name')`, but the
+v2 schema indexes only `id`, `period` and `archived`, so Dexie threw
+`SchemaError: KeyPath name on object store budgets is not indexed` as soon as a
+screen read the list. The service spec had missed it by only exercising
+`statuses`, which reads via `toArray`. Fixed by sorting in memory rather than
+adding an index: a ledger has tens of budgets, an index would buy nothing, and
+tying display order to the schema would mean a migration to reorder a list.
 
-**Tests** — ordering by proximity to limit; empty state when none exist.
+**Left for 2.4.** The Summary entry point is currently a plain row ("1 active /
+All within limit"). Task 2.4 replaces it with the card showing the budgets
+closest to their limits.
+
+### 2.4 Dashboard integration ⬅ next
+
+- [ ] Replace the placeholder Summary row with a card showing the two or three
+      budgets closest to their limits, with remaining amounts and bars
+- [ ] Keep the empty state pointing at budget creation
+- [ ] Over-budget budgets called out rather than buried
+
+**Tests** — ordering by proximity to limit; empty state when none exist; the
+card reflecting a budget crossing its limit.
 
 ---
 
