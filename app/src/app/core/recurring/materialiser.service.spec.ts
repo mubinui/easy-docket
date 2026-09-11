@@ -67,6 +67,23 @@ describe('MaterialiserService', () => {
     });
   });
 
+  it('falls back to the rule name when there is no payee', async () => {
+    // Otherwise a rule called "Rent" shows up in the ledger as "Untitled".
+    await device.db.recurringRules.put({ ...RULE, payee: '  ' });
+    await device.materialiser.run('2026-01-20');
+
+    const [txn] = await device.db.transactions.toArray();
+    expect(txn.payee).toBe('Rent');
+  });
+
+  it('prefers an explicit payee over the rule name', async () => {
+    await device.db.recurringRules.put({ ...RULE, payee: 'Acme Lettings' });
+    await device.materialiser.run('2026-01-20');
+
+    const [txn] = await device.db.transactions.toArray();
+    expect(txn.payee).toBe('Acme Lettings');
+  });
+
   it('leaves the transaction uncleared', async () => {
     // The rule says the money was due, not that it has moved; the user
     // confirms it against a statement like anything else.

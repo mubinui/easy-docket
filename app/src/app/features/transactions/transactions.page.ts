@@ -1,7 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { addIcons } from 'ionicons';
-import { addOutline, chevronBackOutline, chevronForwardOutline } from 'ionicons/icons';
+import {
+  addOutline,
+  chevronBackOutline,
+  chevronForwardOutline,
+  repeatOutline,
+} from 'ionicons/icons';
 import { Transaction } from '../../core/models/domain';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
@@ -14,6 +20,7 @@ import { SyncStatusComponent } from '../../shared/sync-status.component';
 import { TransactionEditorComponent } from './transaction-editor.component';
 import {
   IonButton,
+  IonButtons,
   IonContent,
   IonFab,
   IonFabButton,
@@ -37,7 +44,7 @@ import {
 @Component({
   selector: 'app-transactions',
   standalone: true,
-  imports: [FormsModule, MoneyPipe, DayPipe, SyncStatusComponent, TransactionEditorComponent, IonButton, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonItemGroup, IonLabel, IonList, IonModal, IonNote, IonRefresher, IonRefresherContent, IonSearchbar, IonTitle, IonToolbar],
+  imports: [FormsModule, RouterLink, MoneyPipe, DayPipe, SyncStatusComponent, TransactionEditorComponent, IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonItemGroup, IonLabel, IonList, IonModal, IonNote, IonRefresher, IonRefresherContent, IonSearchbar, IonTitle, IonToolbar],
   styles: [
     `
       .month {
@@ -66,6 +73,12 @@ import {
     <ion-header>
       <ion-toolbar>
         <ion-title>Activity</ion-title>
+        <ion-buttons slot="end">
+          <!-- Standing instructions live with the transactions they produce. -->
+          <ion-button [routerLink]="['/recurring']" aria-label="Recurring">
+            <ion-icon slot="icon-only" name="repeat-outline" />
+          </ion-button>
+        </ion-buttons>
         <app-sync-status slot="end" />
       </ion-toolbar>
       <ion-toolbar>
@@ -218,6 +231,6 @@ export class TransactionsPage {
   }
 
   constructor() {
-    addIcons({ addOutline, chevronBackOutline, chevronForwardOutline });
+    addIcons({ addOutline, chevronBackOutline, chevronForwardOutline, repeatOutline });
   }
 }

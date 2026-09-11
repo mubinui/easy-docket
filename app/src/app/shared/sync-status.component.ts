@@ -24,7 +24,12 @@ import {
   standalone: true,
   imports: [IonButton, IonIcon, IonSpinner],
   template: `
-    <ion-button fill="clear" [disabled]="status().state === 'syncing'" (click)="syncNow()">
+    <ion-button
+      fill="clear"
+      [attr.aria-label]="label()"
+      [disabled]="status().state === 'syncing'"
+      (click)="syncNow()"
+    >
       @if (status().state === 'syncing') {
         <ion-spinner name="dots" />
       } @else {
@@ -50,6 +55,16 @@ export class SyncStatusComponent {
     if (this.status().state === 'error') return 'danger';
     if (this.settings.settings().target.kind === 'none') return 'medium';
     return this.status().pending > 0 ? 'warning' : 'success';
+  });
+
+  /** An icon alone says nothing to a screen reader; this is the same state in words. */
+  readonly label = computed(() => {
+    if (this.status().state === 'syncing') return 'Syncing';
+    if (this.status().state === 'error') return 'Sync failed — tap to retry';
+    if (this.settings.settings().target.kind === 'none') return 'Sync not configured';
+    return this.status().pending > 0
+      ? `Sync ${this.status().pending} pending change(s)`
+      : 'Synced — tap to sync now';
   });
 
   async syncNow(): Promise<void> {

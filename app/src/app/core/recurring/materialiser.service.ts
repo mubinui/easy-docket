@@ -109,7 +109,9 @@ function toTransaction(rule: RecurringRule, id: string, date: string): Transacti
     counterAccountId: rule.counterAccountId,
     categoryId: rule.categoryId,
     date,
-    payee: rule.payee,
+    // A rule named "Rent" with no payee should read as "Rent" in the ledger,
+    // not as "Untitled". The name is what the user called this money.
+    payee: rule.payee.trim() || rule.name,
     note: rule.note,
     tags: rule.tags,
     // Not cleared: the rule says the money was due, not that it has moved.

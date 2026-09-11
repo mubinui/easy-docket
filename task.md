@@ -26,11 +26,11 @@ Every task follows the same loop, and none of it is optional:
 | 1 | Core ledger | ✅ Done |
 | 2 | Budgets | ✅ Done |
 | 3 | Reports | ✅ Done |
-| 4 | Recurring transactions | 🔄 In progress — 4.1, 4.2 done |
-| 5 | Multi-currency | ⬜ Planned |
+| 4 | Recurring transactions | ✅ Done |
+| 5 | Multi-currency | ⬜ Next |
 | 6 | Release readiness | 🔄 6.5 done |
 
-Tests today: **390 client unit**, **33 end-to-end**, **84 Go**.
+Tests today: **408 client unit**, **42 end-to-end**, **84 Go**.
 
 ---
 
@@ -320,7 +320,7 @@ filtered transaction view that the Activity screen already provides.
 
 ---
 
-## Phase 4 — Recurring transactions 🔄
+## Phase 4 — Recurring transactions ✅
 
 Goal: rent, salary and subscriptions appear without being typed monthly.
 
@@ -410,12 +410,46 @@ starts in the same place, that is a fixed answer — every run after the first
 created nothing. `occurrencesUpTo` now takes a resume point, and the materialiser
 reads it from the operation log.
 
-### 4.3 UI
-- [ ] Rule list and editor; "skip this occurrence"; upcoming preview
+### 4.3 Rule screens ✅
+
+- [x] `core/repositories/recurring.service.ts` — live signals, validation,
+      archive, delete, and `upcoming` sorted by next due date
+- [x] `features/recurring/rules.page.ts` at `/recurring`, reached from the
+      Activity screen's toolbar — standing instructions belong with the
+      transactions they produce, not in Settings
+- [x] `rule-editor.component.ts` — the transaction fields plus a schedule, with
+      "ends: never / on a date / after N times"
+- [x] Skip the next occurrence from the list
+
+**The preview is the point of the editor.** "Every 1 month from the 31st" is
+hard to picture and easy to get wrong, so the editor shows the next three dates
+it would actually produce. That is where a user discovers February lands on the
+28th, rather than finding out in March.
+
+**Tests** (18 unit added, 390 → 408; 9 end-to-end, 33 → 42)
+- [x] Service: validation (name, amount, interval, end before start, occurrence
+      limit, transfer needing a distinct destination), negative amounts
+      normalised rather than rejected, upcoming ordered by due date with
+      finished rules sorted last, archive and delete
+- [x] End-to-end: the empty state, cadence and next date, the schedule preview
+      showing 31 January then 28 February, a due occurrence materialising on
+      open, **no duplicate on a second open**, **a deleted occurrence staying
+      deleted**, skipping moving the rule on, a skipped occurrence never
+      recorded, and deleting a rule keeping the transactions it already made
+
+**Two things the end-to-end run found.**
+
+*A rule named "Rent" produced a transaction reading "Untitled".* The materialiser
+copied `rule.payee`, which is usually blank — the name is what the user actually
+called that money. It now falls back to the rule name.
+
+*The sync indicator had no accessible name.* An icon-only button, invisible to a
+screen reader. It now reports its state in words: "Synced — tap to sync now",
+"Sync failed — tap to retry", and so on.
 
 ---
 
-## Phase 5 — Multi-currency
+## Phase 5 — Multi-currency ⬅ next
 
 Goal: accounts in different currencies that still roll into one net worth.
 
