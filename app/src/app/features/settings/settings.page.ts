@@ -7,6 +7,7 @@ import {
   informationCircleOutline,
   lockClosedOutline,
   shieldOutline,
+  documentTextOutline,
   swapHorizontalOutline,
 } from 'ionicons/icons';
 import { VaultService } from '../../core/keys/vault.service';
@@ -73,6 +74,13 @@ import {
 
       <ion-list>
         <ion-list-header><ion-label>Money</ion-label></ion-list-header>
+        <ion-item button routerLink="/data" detail="true">
+          <ion-icon slot="start" name="document-text-outline" />
+          <ion-label>
+            <h3>Import and backup</h3>
+            <p>Bring in a statement, or save a copy of everything</p>
+          </ion-label>
+        </ion-item>
         <ion-item button routerLink="/rates" detail="true">
           <ion-icon slot="start" name="swap-horizontal-outline" />
           <ion-label>
@@ -160,6 +168,7 @@ export class SettingsPage {
       lockClosedOutline,
       informationCircleOutline,
       swapHorizontalOutline,
+      documentTextOutline,
     });
   }
 }

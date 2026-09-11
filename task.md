@@ -28,9 +28,9 @@ Every task follows the same loop, and none of it is optional:
 | 3 | Reports | ✅ Done |
 | 4 | Recurring transactions | ✅ Done |
 | 5 | Multi-currency | ✅ Done |
-| 6 | Release readiness | ⬅ next — 6.5 done |
+| 6 | Release readiness | 🔄 6.1, 6.5 done |
 
-Tests today: **469 client unit**, **51 end-to-end**, **84 Go**.
+Tests today: **528 client unit**, **57 end-to-end**, **84 Go**.
 
 ---
 
@@ -576,9 +576,50 @@ the vault's reporting currency. Both corrected.
 
 ## Phase 6 — Release readiness
 
-- [ ] **6.1 Import / export** — CSV import with column mapping; encrypted full
-      backup file; restore flow. Tests: malformed CSV, duplicate detection,
-      round-trip of a backup.
+- [x] **6.1 Import / export** ✅ — CSV import and an encrypted backup, both
+      reachable from Settings → Import and backup.
+
+  **Import resolves the whole file before writing anything.** The user sees how
+  many rows are ready, how many look like repeats, and how many could not be
+  read — each named with its line. Importing is the one action that can add a
+  thousand rows at once, and a half-succeeded import is far harder to undo than
+  to prevent.
+
+  **The CSV reader is written, not borrowed.** The input is a file from a bank
+  whose conventions nobody controls, and the failure mode of getting it subtly
+  wrong is a ledger full of shifted columns. RFC 4180 is small enough to
+  implement exactly, and the tests cover what exports actually contain: quoted
+  commas, doubled quotes, fields spanning lines, byte-order marks, accounting
+  parentheses for negatives, trailing minus signs, thousands separators in both
+  conventions, and the difference between "1,50" and "1,500".
+
+  **Ambiguous dates are stated, not guessed.** 03/04 is two different days
+  either side of the Atlantic, so the screen carries a day-first switch and
+  re-reads the file when it changes rather than leaving counts from the previous
+  setting on screen.
+
+  **A backup is a snapshot, not the operation log.** The log is how devices
+  reconcile; a backup answers "what did this ledger look like at this moment",
+  and shipping years of superseded operations to answer it would dwarf the
+  ledger. Restoring replays the snapshot as fresh operations, so a restored
+  vault carries on syncing normally, and a row already newer locally is left
+  alone — restoring an old backup should not undo work done since.
+
+  **The file is encrypted with the vault key**, like anything sent to a sync
+  destination. That has a consequence worth stating in the UI, and it is: the
+  backup is the *data*, the recovery bundle is the *key*, and you need both.
+
+  **Tests** (59 unit, 469 → 528; 6 end-to-end, 51 → 57) — including a real
+  import through the browser with a quoted comma in a payee, a second import of
+  the same file adding nothing, and a backup round-trip that survives deleting
+  the transaction in between.
+
+  **What the browser run found.** The failure message for a file that was not a
+  backup read "Envelope truncated before header" — a sentence for a developer,
+  not a person holding the wrong file. Base64 that will not decode, bytes that
+  are not an envelope, and a wrong key now share one explanation, which is also
+  the right call for not confirming anything to someone holding a file they
+  should not have.
 - [ ] **6.2 Biometric unlock** on Android, gating keystore retrieval.
 - [ ] **6.3 Oplog compaction** — see Known gaps.
 - [ ] **6.4 Play Store signing** — `signingConfigs` wired to
