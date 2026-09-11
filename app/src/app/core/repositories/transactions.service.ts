@@ -5,13 +5,8 @@ import { from } from 'rxjs';
 import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { Transaction } from '../models/domain';
+import { DateRange, currentMonth } from '../util/dates';
 import { LedgerService } from './ledger.service';
-
-/** Inclusive date range in `YYYY-MM-DD` form. */
-export interface DateRange {
-  from: string;
-  to: string;
-}
 
 /**
  * What a caller must supply to record a transaction. Everything else — note,
@@ -171,19 +166,3 @@ function assertValid(txn: Transaction): void {
   }
 }
 
-/** `YYYY-MM-DD` for a date in the *local* calendar, not UTC. */
-export function toIsoDate(date = new Date()): string {
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
-}
-
-export function currentMonth(today = new Date()): DateRange {
-  const first = new Date(today.getFullYear(), today.getMonth(), 1);
-  const last = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  return { from: toIsoDate(first), to: toIsoDate(last) };
-}
-
-export function shiftMonth(range: DateRange, delta: number): DateRange {
-  const anchor = new Date(`${range.from}T00:00:00`);
-  return currentMonth(new Date(anchor.getFullYear(), anchor.getMonth() + delta, 1));
-}

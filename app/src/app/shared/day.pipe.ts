@@ -1,5 +1,5 @@
 import { Pipe, PipeTransform } from '@angular/core';
-import { toIsoDate } from '../core/repositories/transactions.service';
+import { toIsoDate } from '../core/util/dates';
 
 /**
  * Renders a `YYYY-MM-DD` ledger date as a human heading, using "Today" and

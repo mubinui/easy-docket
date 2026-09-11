@@ -25,12 +25,12 @@ Every task follows the same loop, and none of it is optional:
 | --- | --- | --- |
 | 1 | Core ledger | ✅ Done |
 | 2 | Budgets | ✅ Done |
-| 3 | Reports | ⬜ Next |
+| 3 | Reports | 🔄 In progress — 3.1 done |
 | 4 | Recurring transactions | ⬜ Planned |
 | 5 | Multi-currency | ⬜ Planned |
 | 6 | Release readiness | 🔄 6.5 done |
 
-Tests today: **207 client unit**, **26 end-to-end**, **84 Go**.
+Tests today: **249 client unit**, **26 end-to-end**, **84 Go**.
 
 ---
 
@@ -184,18 +184,48 @@ component tests for it must supply one.
 
 ---
 
-## Phase 3 — Reports ⬅ next
+## Phase 3 — Reports 🔄
 
 Goal: answer "where did it go, and is that normal?" — derived entirely from
 transactions, so no new storage.
 
-### 3.1 Aggregation layer
-- [ ] Pure functions in `core/reports/`: spend by category, income vs expense by
-      month, net worth over time, top payees
-- [ ] Arbitrary date ranges, not just whole months
+### 3.1 Aggregation layer ✅
 
-**Tests** — each aggregation against a fixed fixture ledger; empty ranges;
-single-transaction ranges; transfers excluded from income/expense totals.
+- [x] `core/reports/aggregate.ts` — `spendByCategory`, `flowByMonth`,
+      `netWorthOver`, `topPayees`, `totalsFor`. Pure, arbitrary ranges.
+- [x] `core/util/dates.ts` — calendar helpers moved out of
+      `TransactionsService` so a pure module can use them without reaching into
+      a repository. `DateRange`, `monthsIn`, `endOfMonth` and friends now live
+      in one place, and eight files import from there.
+
+**Tests** (42 added, 207 → 249)
+- [x] `dates.spec.ts` — local-calendar dates (a late-evening entry belongs to
+      the day the user saw, not the UTC day), month listing across year
+      boundaries, February in leap and common years, reversed ranges returning
+      empty rather than looping
+- [x] `aggregate.spec.ts` — one small fixture ledger whose numbers can be
+      checked by hand, covering every aggregation: empty ranges, single
+      transactions, uncategorised spending sorted last, blank payees ignored,
+      history before the range still counting toward net worth, the final point
+      clamped to the range end, and a zero-valued expense not dividing by zero
+
+**Decisions.**
+
+*Transfers are never income or expense.* Moving money between your own accounts
+is neither earning nor spending it, and a report that counted them would make
+someone look wildly richer and more profligate than they are. Every aggregation
+enforces this, and `netWorthOver` is asserted to be identical with and without
+the fixture's transfer.
+
+*Empty months keep their bucket.* Dropping a month with no activity would
+compress the chart and imply a continuity that did not happen.
+
+*Net worth is cumulative, not windowed.* Net worth on a date is everything that
+has ever happened up to it, so transactions before the range still count — only
+the points shown are bounded by it.
+
+*Blank payees are dropped from `topPayees`.* Lumping every unnamed expense under
+`""` would invent a merchant that dwarfs the real ones.
 
 ### 3.2 Charts
 - [ ] Inline SVG chart components — donut, bar, line

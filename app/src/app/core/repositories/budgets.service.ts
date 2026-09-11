@@ -7,7 +7,7 @@ import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { Budget } from '../models/domain';
 import { LedgerService } from './ledger.service';
-import { toIsoDate } from './transactions.service';
+import { toIsoDate } from '../util/dates';
 
 /** What a caller must supply to create a budget; the rest defaults. */
 export type BudgetDraft = Pick<

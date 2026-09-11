@@ -5,7 +5,7 @@ import { DOCKET_DB } from '../../core/db/db.token';
 import { DocketDb } from '../../core/db/docket-db';
 import { BudgetsService } from '../../core/repositories/budgets.service';
 import { LedgerService } from '../../core/repositories/ledger.service';
-import { toIsoDate } from '../../core/repositories/transactions.service';
+import { toIsoDate } from '../../core/util/dates';
 import { aBudget, aCategory, aTransaction } from '../../core/testing/factories';
 import { BudgetsPage } from './budgets.page';
 

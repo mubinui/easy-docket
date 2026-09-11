@@ -20,7 +20,7 @@ import { Budget, BudgetPeriod } from '../../core/models/domain';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { BudgetsService } from '../../core/repositories/budgets.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
-import { toIsoDate } from '../../core/repositories/transactions.service';
+import { toIsoDate } from '../../core/util/dates';
 import { formatAmount, parseAmount } from '../../core/util/money';
 
 const PERIODS: ReadonlyArray<{ value: BudgetPeriod; label: string }> = [

@@ -3,7 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { Transaction, TransactionKind } from '../../core/models/domain';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
-import { TransactionsService, toIsoDate } from '../../core/repositories/transactions.service';
+import { TransactionsService } from '../../core/repositories/transactions.service';
+import { toIsoDate } from '../../core/util/dates';
 import { formatAmount, parseAmount } from '../../core/util/money';
 import {
   IonButton,

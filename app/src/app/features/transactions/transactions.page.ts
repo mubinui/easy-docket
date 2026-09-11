@@ -5,7 +5,8 @@ import { addOutline, chevronBackOutline, chevronForwardOutline } from 'ionicons/
 import { Transaction } from '../../core/models/domain';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
-import { TransactionsService, shiftMonth } from '../../core/repositories/transactions.service';
+import { TransactionsService } from '../../core/repositories/transactions.service';
+import { shiftMonth } from '../../core/util/dates';
 import { SyncSchedulerService } from '../../core/sync/sync-scheduler.service';
 import { DayPipe } from '../../shared/day.pipe';
 import { MoneyPipe } from '../../shared/money.pipe';

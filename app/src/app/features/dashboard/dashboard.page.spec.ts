@@ -5,7 +5,7 @@ import { DOCKET_DB } from '../../core/db/db.token';
 import { MemorySecureStore, SecureStore } from '../../core/keys/secure-store';
 import { DocketDb } from '../../core/db/docket-db';
 import { LedgerService } from '../../core/repositories/ledger.service';
-import { toIsoDate } from '../../core/repositories/transactions.service';
+import { toIsoDate } from '../../core/util/dates';
 import { aBudget, aCategory, anAccount, aTransaction } from '../../core/testing/factories';
 import { DashboardPage } from './dashboard.page';
 
