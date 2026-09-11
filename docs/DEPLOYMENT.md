@@ -60,37 +60,103 @@ It is effectively permanent once published.
 
 ### Play Store release
 
-1. Create an upload key:
+Releases are automated: tagging `v1.4.0` builds a signed bundle and sends it to
+the internal track. Setting that up is a one-off, and the order matters.
 
-   ```bash
-   keytool -genkey -v -keystore docket-upload.jks -keyalg RSA \
-     -keysize 2048 -validity 10000 -alias upload
-   ```
+#### 1. Create an upload key
 
-   Keep it out of the repository — `.gitignore` already excludes `*.jks` and
-   `keystore.properties`.
+```bash
+keytool -genkeypair -v -keystore docket-upload.jks -keyalg RSA \
+  -keysize 2048 -validity 10000 -alias upload
+```
 
-2. Add `android/keystore.properties`:
+Back this up somewhere you will still have in five years. With Play App Signing
+a lost upload key can be reset by Google, but a lost *release* history cannot be
+reconstructed, and losing the key on an app not enrolled in Play App Signing
+means never updating it again.
 
-   ```properties
-   storeFile=/absolute/path/docket-upload.jks
-   storePassword=…
-   keyAlias=upload
-   keyPassword=…
-   ```
+`.gitignore` already excludes `*.jks` and `keystore.properties`.
 
-3. Reference it from `android/app/build.gradle` in a `signingConfigs` block and
-   attach it to `buildTypes.release`.
+#### 2. Build and upload the first release by hand
 
-4. Bump `versionCode` and `versionName`, then:
+The API cannot create an app, only add releases to one that exists. So the first
+bundle goes up through the Play Console, which is also where you complete the
+store listing, content rating and data-safety form.
 
-   ```bash
-   npm run android:bundle    # android/app/build/outputs/bundle/release/app-release.aab
-   ```
+```bash
+cd app
+DOCKET_KEYSTORE_FILE=$PWD/../docket-upload.jks \
+DOCKET_KEYSTORE_PASSWORD=… DOCKET_KEY_ALIAS=upload DOCKET_KEY_PASSWORD=… \
+DOCKET_VERSION_CODE=1 DOCKET_VERSION_NAME=1.0.0 \
+npm run android:bundle
+# app/android/app/build/outputs/bundle/release/app-release.aab
+```
 
-5. Upload the `.aab`. The listing needs a privacy policy URL; the honest
-   summary is that the app collects nothing and transmits only ciphertext to a
-   destination the user configures.
+Locally you can put the same values in `app/android/keystore.properties`
+instead, which the build reads in preference to the environment:
+
+```properties
+storeFile=/absolute/path/docket-upload.jks
+storePassword=…
+keyAlias=upload
+keyPassword=…
+```
+
+With neither present the release build still works and simply comes out
+unsigned, so a contributor or an ordinary CI job never needs the key.
+
+#### 3. Create a service account
+
+In the Google Cloud console, make a service account and a JSON key for it. Then
+in **Play Console → Users and permissions**, invite that service account's email
+and grant it *Release to testing tracks* and *Release to production* on this app
+only. The invitation has to be accepted in the Play Console before the API will
+accept anything from it — a fresh account returns a permissions error that does
+not say this.
+
+#### 4. Add the repository secrets
+
+| Secret | What it holds |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | `base64 -i docket-upload.jks` |
+| `ANDROID_KEYSTORE_PASSWORD` | The keystore password |
+| `ANDROID_KEY_ALIAS` | `upload` |
+| `ANDROID_KEY_PASSWORD` | The key password |
+| `PLAY_SERVICE_ACCOUNT_JSON` | The whole service-account JSON, pasted |
+
+Without `PLAY_SERVICE_ACCOUNT_JSON` the workflow still builds and signs the
+bundle and attaches it as an artifact; it just does not upload. That is
+deliberate, so the pipeline can be proved before it is trusted with the store.
+
+#### 5. Release
+
+```bash
+git tag v1.4.0 && git push origin v1.4.0
+```
+
+The workflow runs the test suite, builds the bundle, checks it really is signed,
+and uploads it to the internal track. To promote it, or to publish a specific
+version to another track, run **Release to Play Store** from the Actions tab and
+choose the track.
+
+#### versionCode
+
+Play orders releases by `versionCode` and refuses one it has seen before. The
+workflow passes `github.run_number`, which only ever increases — the single
+property that matters. `versionName` comes from the tag, so `v1.4.0` ships as
+`1.4.0`. Nothing needs editing in `build.gradle` to cut a release.
+
+#### The listing
+
+The data-safety form is the part worth getting right. Easy Docket collects
+nothing, and transmits only ciphertext to a destination the user configures, so
+the honest answers are "no data collected" and "no data shared" — with the
+caveat that a user who configures sync is sending encrypted data to a service of
+their own choosing, which the form has no good box for. Say so in the privacy
+policy rather than leaving it implied.
+
+The biometric plugin adds `USE_BIOMETRIC` and `USE_FINGERPRINT` to the manifest;
+both are normal permissions needing no declaration form.
 
 ## The sync server
 

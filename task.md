@@ -28,7 +28,7 @@ Every task follows the same loop, and none of it is optional:
 | 3 | Reports | ✅ Done |
 | 4 | Recurring transactions | ✅ Done |
 | 5 | Multi-currency | ✅ Done |
-| 6 | Release readiness | 🔄 6.1–6.3, 6.5 done |
+| 6 | Release readiness | ✅ Done |
 
 Tests today: **552 client unit**, **59 end-to-end**, **95 Go**.
 
@@ -696,8 +696,38 @@ the vault's reporting currency. Both corrected.
   should leave a working but untidy vault rather than a broken one. Both are
   tested, the latter with an adapter that refuses every delete.
 
-- [ ] **6.4 Play Store signing** — `signingConfigs` wired to
-      `keystore.properties`, release workflow producing a signed `.aab`.
+- [x] **6.4 Play Store signing and release** ✅ — signing wired to
+      `keystore.properties` or the environment, and a workflow that tags to a
+      release.
+
+  **An absent key produces an unsigned build, not a failure.** A contributor who
+  has just cloned the repository, and every CI job that is not a release, must
+  be able to build the app. So `hasSigningConfig` decides whether a signing
+  config exists at all, and the release build says plainly when it is unsigned.
+
+  **`versionCode` comes from the workflow run number.** Play orders releases by
+  it and refuses one it has seen, so the only property that matters is that it
+  increases; `versionName` comes from the tag. Nothing in `build.gradle` needs
+  editing to cut a release.
+
+  **The workflow refuses to upload something unsigned.** An unsigned bundle is
+  exactly what this build produces when the key is missing, and Play rejects it
+  with a far less obvious message — so the workflow checks for a signature
+  itself before going anywhere near the store.
+
+  **Without the Play credentials it still builds, signs and attaches the
+  bundle**, and warns rather than failing. The pipeline can be proved before it
+  is trusted with the store.
+
+  **Verified locally**: the unsigned fallback builds, a signed bundle carries
+  `META-INF/UPLOAD.RSA`, and `DOCKET_VERSION_CODE=42 DOCKET_VERSION_NAME=1.2.3`
+  reaches the manifest as `versionCode='42' versionName='1.2.3'`.
+
+  **Not verified, and cannot be from here**: the upload itself. The first
+  release has to go up through the Play Console by hand — the API adds releases
+  to an app, it cannot create one — and the service account has to be invited
+  and accepted there before it will accept anything. `docs/DEPLOYMENT.md` walks
+  through both.
 - [x] **6.5 E2E suite in CI** ✅ — Playwright, 26 tests, running the real Go
       sync server rather than a mock. `app/e2e/`, wired into CI as its own job.
 

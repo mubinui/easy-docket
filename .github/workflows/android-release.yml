@@ -1,0 +1,146 @@
+name: Release to Play Store
+
+# Tagging `v1.4.0` builds a signed bundle and sends it to the internal track.
+# `workflow_dispatch` does the same with an explicit track, which is how a build
+# already on internal gets promoted without rebuilding it.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      track:
+        description: Play track to publish to
+        type: choice
+        default: internal
+        options: [internal, alpha, beta, production]
+      status:
+        description: Release status on that track
+        type: choice
+        default: completed
+        options: [draft, inProgress, halted, completed]
+      versionName:
+        description: Version name, e.g. 1.4.0 (defaults to the tag)
+        type: string
+        required: false
+
+# One release at a time, and never cancel one midway: a half-finished upload to
+# Play is worse than a slow one.
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Signed bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Work out the version
+        id: version
+        run: |
+          name="${{ inputs.versionName }}"
+          if [ -z "$name" ]; then
+            # refs/tags/v1.4.0 -> 1.4.0
+            name="${GITHUB_REF_NAME#v}"
+          fi
+
+          # Play orders releases by versionCode and refuses one it has seen
+          # before. The run number only ever increases, which is the single
+          # property that matters here.
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "Releasing $name (versionCode ${{ github.run_number }})"
+
+      - name: Install
+        working-directory: app
+        run: npm ci
+
+      # A release that fails its own tests is not a release.
+      - name: Test
+        working-directory: app
+        run: npm run test:ci
+
+      - name: Build the web bundle
+        working-directory: app
+        run: npm run cap:sync
+
+      - name: Restore the upload key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set. See docs/DEPLOYMENT.md."
+            exit 1
+          fi
+          # Outside the workspace, so it cannot be picked up by an artifact
+          # upload or left behind in a cached directory.
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+
+      - name: Build the bundle
+        working-directory: app/android
+        env:
+          DOCKET_KEYSTORE_FILE: ${{ runner.temp }}/upload.jks
+          DOCKET_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          DOCKET_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          DOCKET_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          DOCKET_VERSION_CODE: ${{ steps.version.outputs.code }}
+          DOCKET_VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: ./gradlew bundleRelease --no-daemon
+
+      - name: Check the bundle is actually signed
+        working-directory: app/android
+        run: |
+          # An unsigned bundle is what this build produces when the key is
+          # missing, and Play rejects it with a far less obvious message.
+          if ! unzip -l app/build/outputs/bundle/release/app-release.aab \
+               | grep -qiE 'META-INF/.*\.(RSA|EC|DSA)'; then
+            echo "::error::The bundle is unsigned; the signing configuration did not apply."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-${{ steps.version.outputs.name }}.aab
+          path: app/android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Is a Play service account configured?
+        id: play
+        env:
+          CREDENTIALS: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$CREDENTIALS" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::PLAY_SERVICE_ACCOUNT_JSON is not set; the bundle was built but not uploaded."
+          fi
+
+      - name: Upload to Play
+        if: steps.play.outputs.configured == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: net.xiidea.docket
+          releaseFiles: app/android/app/build/outputs/bundle/release/app-release.aab
+          track: ${{ inputs.track || 'internal' }}
+          status: ${{ inputs.status || 'completed' }}
+
+      - name: Remove the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.jks"

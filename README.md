@@ -78,6 +78,17 @@ The suites that matter most are the ones that hold the central promises:
 The zero-knowledge claim was also checked against the real stack rather than a
 test double — see [Security](docs/SECURITY.md#how-the-main-claim-was-checked).
 
+## Releasing
+
+- **PWA** — every push to `main` deploys to GitHub Pages.
+- **Android** — tagging `v1.4.0` builds a signed bundle and publishes it to the
+  Play Store's internal track. See
+  [Deployment](docs/DEPLOYMENT.md#play-store-release) for the one-off setup:
+  an upload key, a service account, five repository secrets, and a first
+  release uploaded by hand because the API cannot create an app.
+- **Sync server** — the same tag publishes a multi-architecture image and
+  cross-compiled binaries.
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — layers, data flow, storage, sync protocol

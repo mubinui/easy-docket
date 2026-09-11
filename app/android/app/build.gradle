@@ -1,5 +1,38 @@
 apply plugin: 'com.android.application'
 
+/**
+ * Release signing.
+ *
+ * Credentials come from `keystore.properties` beside this file, or from the
+ * environment when a CI job supplies them. Both are absent for anyone who has
+ * just cloned the repository, and that has to keep working: a contributor
+ * building the app, and every CI job that is not a release, should not need a
+ * signing key. So an absent configuration produces an unsigned build rather
+ * than a failure, and `bundleRelease` only signs when there is something to
+ * sign with.
+ */
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def signingValue = { String key, String envName ->
+    keystoreProperties.getProperty(key) ?: System.getenv(envName)
+}
+
+def storeFilePath = signingValue('storeFile', 'DOCKET_KEYSTORE_FILE')
+def hasSigningConfig = storeFilePath != null && file(storeFilePath).exists()
+
+/**
+ * The Play Store orders releases by `versionCode`, which must increase with
+ * every upload and is never shown to anyone. The release workflow passes the
+ * run number; a local build keeps 1, which is fine because a local build is
+ * never uploaded.
+ */
+def versionCodeValue = (System.getenv('DOCKET_VERSION_CODE') ?: '1') as Integer
+def versionNameValue = System.getenv('DOCKET_VERSION_NAME') ?: '1.0'
+
 android {
     namespace = "net.xiidea.docket"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +40,8 @@ android {
         applicationId "net.xiidea.docket"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode versionCodeValue
+        versionName versionNameValue
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +49,27 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    if (hasSigningConfig) {
+        signingConfigs {
+            release {
+                storeFile file(storeFilePath)
+                storePassword signingValue('storePassword', 'DOCKET_KEYSTORE_PASSWORD')
+                keyAlias signingValue('keyAlias', 'DOCKET_KEY_ALIAS')
+                keyPassword signingValue('keyPassword', 'DOCKET_KEY_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            if (hasSigningConfig) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.lifecycle('No signing configuration found; the release build will be unsigned.')
+            }
         }
     }
 }
