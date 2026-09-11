@@ -1,7 +1,7 @@
 import Dexie from 'dexie';
 import { describe, expect, it } from 'vitest';
 import { DocketDb, SCHEMA_VERSION } from './docket-db';
-import { aBudget, anAccount, aTransaction } from '../testing/factories';
+import { aBudget, anAccount, anAccountGroup, aTransaction } from '../testing/factories';
 
 /**
  * Schema migration tests.
@@ -20,6 +20,27 @@ const V1_STORES = {
   remoteObjects: 'name',
   meta: 'key',
 };
+
+/**
+ * The schema exactly as the previous release declared it. Hand-written for the
+ * same reason as `V1_STORES`: a fixture copied from the current source would
+ * follow every change made to it and catch nothing.
+ */
+const V5_VERSIONS: ReadonlyArray<[number, Record<string, string>]> = [
+  [1, V1_STORES],
+  [2, { budgets: 'id, period, archived' }],
+  [3, { recurringRules: 'id, startDate, archived' }],
+  [4, { rates: 'id, date, [base+quote+date]' }],
+  [5, { vaultSettings: 'id' }],
+];
+
+/** Open `name` at v5, as a device on the previous release would have it. */
+async function openAtV5(name: string): Promise<Dexie> {
+  const legacy = new Dexie(name);
+  for (const [version, stores] of V5_VERSIONS) legacy.version(version).stores(stores);
+  await legacy.open();
+  return legacy;
+}
 
 let counter = 0;
 
@@ -79,6 +100,7 @@ describe('DocketDb schema', () => {
     await db.open();
 
     expect(db.tables.map((t) => t.name).sort()).toEqual([
+      'accountGroups',
       'accounts',
       'budgets',
       'categories',
@@ -134,6 +156,81 @@ describe('DocketDb schema', () => {
     expect(indexes).toContain('period');
     expect(indexes).toContain('archived');
     expect(db.budgets.schema.primKey.keyPath).toBe('id');
+    db.close();
+  });
+
+  it('upgrades a v5 database to v6 with every row intact and accounts ungrouped', async () => {
+    const name = `migration-${counter++}`;
+    await seedV1Database(name);
+
+    const v5 = await openAtV5(name);
+    await v5.table('budgets').put(aBudget({ name: 'Groceries cap' }));
+    await v5.table('vaultSettings').put({
+      id: 'vault',
+      reportingCurrency: 'EUR',
+      createdAt: 1,
+      updatedAt: 'stamp-v',
+    });
+    v5.close();
+
+    const db = new DocketDb(name);
+    await db.open();
+
+    expect(db.verno).toBe(SCHEMA_VERSION);
+    // Everything the previous release wrote is still where it was.
+    expect(await db.accounts.get('acc-1')).toMatchObject({
+      name: 'Everyday',
+      updatedAt: 'stamp-a',
+    });
+    expect((await db.budgets.get('bud-1'))?.name).toBe('Groceries cap');
+    expect((await db.vaultSettings.get('vault'))?.reportingCurrency).toBe('EUR');
+    expect(await db.transactions.get('txn-1')).toBeDefined();
+    expect(await db.oplog.count()).toBe(1);
+
+    // An account written before groups existed reads as ungrouped rather than
+    // being rewritten to carry an explicit null.
+    const account = await db.accounts.get('acc-1');
+    expect(account?.groupId ?? null).toBeNull();
+    expect(Object.hasOwn(account as object, 'groupId')).toBe(false);
+
+    expect(await db.accountGroups.count()).toBe(0);
+
+    db.close();
+  });
+
+  it('indexes account groups and account membership for the accounts screen', async () => {
+    const db = new DocketDb(`indexes-${counter++}`);
+    await db.open();
+
+    const groupIndexes = db.accountGroups.schema.indexes.map((i) => i.keyPath);
+    expect(groupIndexes).toEqual(expect.arrayContaining(['name', 'type', 'order', 'archived']));
+    expect(db.accountGroups.schema.primKey.keyPath).toBe('id');
+
+    // Redeclaring `accounts` in v6 replaces its index set, so the indexes it
+    // already had have to survive alongside the new one.
+    const accountIndexes = db.accounts.schema.indexes.map((i) => i.keyPath);
+    expect(accountIndexes).toEqual(
+      expect.arrayContaining(['name', 'kind', 'archived', 'groupId']),
+    );
+
+    db.close();
+  });
+
+  it('finds the accounts in a group by index', async () => {
+    const db = new DocketDb(`group-query-${counter++}`);
+    await db.open();
+
+    await db.accountGroups.put(anAccountGroup({ id: 'grp-cards' }));
+    await db.accounts.bulkPut([
+      anAccount({ id: 'acc-visa', name: 'Visa', groupId: 'grp-cards' }),
+      anAccount({ id: 'acc-amex', name: 'Amex', groupId: 'grp-cards' }),
+      anAccount({ id: 'acc-loose', name: 'Everyday', groupId: null }),
+      anAccount({ id: 'acc-legacy', name: 'Old' }),
+    ]);
+
+    const inGroup = await db.accounts.where('groupId').equals('grp-cards').toArray();
+    expect(inGroup.map((a) => a.id).sort()).toEqual(['acc-amex', 'acc-visa']);
+
     db.close();
   });
 });

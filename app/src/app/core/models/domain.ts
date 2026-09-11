@@ -10,7 +10,49 @@
 /** Monetary amounts are stored as integer minor units (cents) to avoid float drift. */
 export type Minor = number;
 
+/**
+ * What an account looks like in a list.
+ *
+ * Presentation only: it picks the icon and the label and answers no question
+ * about behaviour. Whether an account is a credit card — and so whether its
+ * balance is a debt and whether it can be paid — is answered by its group's
+ * `AccountGroupType`, never by this. Two fields both claiming to say "is this a
+ * credit card?" is one field too many, and the first time they disagreed the
+ * app would have to pick a winner.
+ */
 export type AccountKind = 'cash' | 'bank' | 'card' | 'wallet' | 'savings' | 'investment';
+
+/**
+ * What a group of accounts *is*, which is what decides how the accounts inside
+ * it behave.
+ *
+ * The type sits on the group rather than on each account so that "these are my
+ * credit cards" is recorded once. Putting it on the account would repeat the
+ * same fact once per card, and repeated facts drift.
+ */
+export type AccountGroupType = 'default' | 'credit-card' | 'debit-card';
+
+/**
+ * A named set of accounts — "Cards", "Joint", "Savings" — with a type.
+ *
+ * Groups own nothing. An account references its group, so deleting a group
+ * leaves its accounts ungrouped rather than taking their history with it.
+ */
+export interface AccountGroup {
+  id: string;
+  name: string;
+  type: AccountGroupType;
+  /**
+   * Where this group sits in the accounts list. Sparse and user-controlled;
+   * ties fall back to name so the order is always total and never flickers.
+   */
+  order: number;
+  colour: string;
+  icon: string;
+  archived: boolean;
+  createdAt: number;
+  updatedAt: string;
+}
 
 export interface Account {
   id: string;
@@ -22,6 +64,17 @@ export interface Account {
   archived: boolean;
   colour: string;
   icon: string;
+
+  /**
+   * The group this account belongs to, or absent/null for ungrouped.
+   *
+   * Optional rather than required so rows written before groups existed need no
+   * migration — the same treatment `Transaction.rate` gets. An account whose
+   * group has been deleted also lands here, which is the intended outcome: it
+   * stays in the ledger, it just stops being filed anywhere.
+   */
+  groupId?: string | null;
+
   createdAt: number;
   updatedAt: string;
 }
@@ -203,6 +256,7 @@ export interface VaultSettings {
  * entity cannot leave a code path quietly behind.
  */
 export const ENTITY_NAMES = [
+  'accountGroups',
   'accounts',
   'categories',
   'transactions',
@@ -215,6 +269,7 @@ export const ENTITY_NAMES = [
 export type EntityName = (typeof ENTITY_NAMES)[number];
 
 export interface EntityMap {
+  accountGroups: AccountGroup;
   accounts: Account;
   categories: Category;
   transactions: Transaction;

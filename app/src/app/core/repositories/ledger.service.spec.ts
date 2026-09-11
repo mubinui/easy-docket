@@ -8,6 +8,7 @@ import {
   aBudget,
   aRecurringRule,
   anAccount,
+  anAccountGroup,
   anExchangeRate,
   aTransaction,
 } from '../testing/factories';
@@ -186,6 +187,94 @@ describe('LedgerService', () => {
       await ledger.remove('budgets', 'shared-id');
       expect(await db.accounts.get('shared-id')).toBeDefined();
       expect(await db.budgets.get('shared-id')).toBeUndefined();
+    });
+  });
+
+  describe('account groups', () => {
+    /**
+     * The fifth entity added since the sync engine was written, and the first
+     * that another entity points at. As with budgets, none of these should have
+     * needed a line of `LedgerService` to pass.
+     */
+    it('records a group like any other entity', async () => {
+      const saved = await ledger.put('accountGroups', anAccountGroup());
+
+      expect(saved.updatedAt).not.toBe('');
+      expect(await db.accountGroups.get('grp-1')).toEqual(saved);
+      expect(await ledger.allOperations()).toMatchObject([
+        { entity: 'accountGroups', op: 'put' },
+      ]);
+    });
+
+    it('tombstones a deleted group', async () => {
+      await ledger.put('accountGroups', anAccountGroup());
+      await ledger.remove('accountGroups', 'grp-1');
+
+      expect(await db.accountGroups.get('grp-1')).toBeUndefined();
+      expect((await ledger.allOperations()).map((o) => o.op)).toEqual(['put', 'delete']);
+    });
+
+    it('merges a group from another device', async () => {
+      const applied = await ledger.merge([
+        {
+          hlc: stampAt(-1_000),
+          entity: 'accountGroups',
+          entityId: 'grp-9',
+          op: 'put',
+          value: anAccountGroup({ id: 'grp-9', name: 'Joint', type: 'default' }),
+          device: 'bbbbbbbb',
+        },
+      ]);
+
+      expect(applied).toBe(1);
+      expect(await db.accountGroups.get('grp-9')).toMatchObject({
+        name: 'Joint',
+        type: 'default',
+      });
+    });
+
+    it('resolves concurrent group edits by clock, like every other entity', async () => {
+      const older = {
+        hlc: stampAt(-20_000),
+        entity: 'accountGroups' as const,
+        entityId: 'grp-9',
+        op: 'put' as const,
+        value: anAccountGroup({ id: 'grp-9', type: 'default' as const }),
+        device: 'bbbbbbbb',
+      };
+      const newer = {
+        ...older,
+        hlc: stampAt(-10_000),
+        value: anAccountGroup({ id: 'grp-9', type: 'credit-card' as const }),
+      };
+
+      await ledger.merge([newer, older]);
+      expect((await db.accountGroups.get('grp-9'))?.type).toBe('credit-card');
+    });
+
+    it('carries an account and its group in one operation each', async () => {
+      // Membership is a field on the account, not a join row, so filing an
+      // account into a group is one ordinary account write.
+      await ledger.put('accountGroups', anAccountGroup({ id: 'grp-cards' }));
+      await ledger.put('accounts', anAccount({ groupId: 'grp-cards' }));
+
+      expect((await db.accounts.get('acc-1'))?.groupId).toBe('grp-cards');
+      expect((await ledger.allOperations()).map((o) => o.entity)).toEqual([
+        'accountGroups',
+        'accounts',
+      ]);
+    });
+
+    it('leaves an account in place when its group is deleted', async () => {
+      // The ledger does not cascade. A dangling `groupId` reads as ungrouped,
+      // which is a far better outcome than an account vanishing with its group.
+      await ledger.put('accountGroups', anAccountGroup({ id: 'grp-cards' }));
+      await ledger.put('accounts', anAccount({ groupId: 'grp-cards' }));
+
+      await ledger.remove('accountGroups', 'grp-cards');
+
+      expect(await db.accountGroups.get('grp-cards')).toBeUndefined();
+      expect(await db.accounts.get('acc-1')).toMatchObject({ groupId: 'grp-cards' });
     });
   });
 

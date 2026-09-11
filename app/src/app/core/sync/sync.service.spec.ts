@@ -16,6 +16,7 @@ import {
   aRecurringRule,
   aTransaction,
   anAccount,
+  anAccountGroup,
   anExchangeRate,
 } from '../testing/factories';
 import { SyncTransportError } from './sync-adapter';
@@ -301,6 +302,78 @@ describe('SyncService', () => {
       await bob.sync.sync(bob.adapter);
 
       expect(await bob.db.budgets.count()).toBe(0);
+    });
+  });
+
+  describe('account groups', () => {
+    it('replicates a group and an account\'s membership of it', async () => {
+      const bob = await makeDevice('bbbbbbbb', key, remote);
+
+      await alice.ledger.put('accountGroups', anAccountGroup({ id: 'grp-cards', name: 'Cards' }));
+      await alice.ledger.put('accounts', anAccount({ groupId: 'grp-cards' }));
+      await alice.sync.sync(alice.adapter);
+      await bob.sync.sync(bob.adapter);
+
+      expect(await bob.db.accountGroups.get('grp-cards')).toMatchObject({
+        name: 'Cards',
+        type: 'credit-card',
+      });
+      expect((await bob.db.accounts.get('acc-1'))?.groupId).toBe('grp-cards');
+    });
+
+    it('encrypts groups like everything else', async () => {
+      await alice.ledger.put(
+        'accountGroups',
+        anAccountGroup({ name: 'Gambling cards', type: 'credit-card' }),
+      );
+      await alice.sync.sync(alice.adapter);
+
+      const dump = alice.adapter.dump();
+      expect(dump).not.toContain('Gambling cards');
+      expect(dump).not.toContain('credit-card');
+      expect(dump).not.toContain('accountGroups');
+    });
+
+    it('propagates a group deletion without taking its accounts with it', async () => {
+      const bob = await makeDevice('bbbbbbbb', key, remote);
+
+      await alice.ledger.put('accountGroups', anAccountGroup({ id: 'grp-cards' }));
+      await alice.ledger.put('accounts', anAccount({ groupId: 'grp-cards' }));
+      await alice.sync.sync(alice.adapter);
+      await bob.sync.sync(bob.adapter);
+      expect(await bob.db.accountGroups.count()).toBe(1);
+
+      await alice.ledger.remove('accountGroups', 'grp-cards');
+      await alice.sync.sync(alice.adapter);
+      await bob.sync.sync(bob.adapter);
+
+      expect(await bob.db.accountGroups.count()).toBe(0);
+      expect(await bob.db.accounts.count()).toBe(1);
+    });
+
+    it('settles on one group when two devices file the same account differently', async () => {
+      // Both devices are offline, both move the same account, both come back.
+      // Whichever write is later by the clock wins the whole account, and the
+      // account is never left in two groups at once.
+      const bob = await makeDevice('bbbbbbbb', key, remote);
+
+      await alice.ledger.put('accountGroups', anAccountGroup({ id: 'grp-a', name: 'A' }));
+      await alice.ledger.put('accountGroups', anAccountGroup({ id: 'grp-b', name: 'B' }));
+      await alice.ledger.put('accounts', anAccount({ groupId: 'grp-a' }));
+      await alice.sync.sync(alice.adapter);
+      await bob.sync.sync(bob.adapter);
+
+      await alice.ledger.put('accounts', anAccount({ groupId: 'grp-a' }));
+      await bob.ledger.put('accounts', anAccount({ groupId: 'grp-b' }));
+
+      await alice.sync.sync(alice.adapter);
+      await bob.sync.sync(bob.adapter);
+      await alice.sync.sync(alice.adapter);
+
+      const onAlice = await alice.db.accounts.get('acc-1');
+      const onBob = await bob.db.accounts.get('acc-1');
+      expect(onAlice?.groupId).toBe(onBob?.groupId);
+      expect(['grp-a', 'grp-b']).toContain(onAlice?.groupId);
     });
   });
 

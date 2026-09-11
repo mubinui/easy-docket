@@ -1,6 +1,7 @@
 import Dexie, { Table } from 'dexie';
 import {
   Account,
+  AccountGroup,
   Budget,
   Category,
   ExchangeRate,
@@ -18,9 +19,9 @@ import { LocalOperation } from '../models/oplog';
  *
  * Two kinds of table live here:
  *
- *  - **Materialised entities** (`accounts`, `categories`, `transactions`,
- *    `budgets`, `recurringRules`) — the current state, indexed for the queries
- *    the UI makes.
+ *  - **Materialised entities** (`accountGroups`, `accounts`, `categories`,
+ *    `transactions`, `budgets`, `recurringRules`) — the current state, indexed
+ *    for the queries the UI makes.
  *  - **Replication bookkeeping** (`oplog`, `remoteObjects`, `meta`) — the
  *    append-only operation log plus a record of which remote objects have
  *    already been merged, so a repeated pull is cheap and idempotent.
@@ -46,9 +47,10 @@ export interface MetaRecord {
  * literal that has to be edited on every bump — a test that needs changing
  * whenever the schema grows stops being a check and becomes a chore.
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export class DocketDb extends Dexie {
+  accountGroups!: Table<AccountGroup, string>;
   accounts!: Table<Account, string>;
   categories!: Table<Category, string>;
   transactions!: Table<Transaction, string>;
@@ -109,6 +111,24 @@ export class DocketDb extends Dexie {
     // v5 — vault-wide settings. One row, so no index beyond the key.
     this.version(5).stores({
       vaultSettings: 'id',
+    });
+
+    // v6 — account groups.
+    //
+    // `accounts` is redeclared only to add the `groupId` index, which answers
+    // the one question the grouped accounts list asks: which accounts are in
+    // this group. Redeclaring a store in Dexie replaces its index set, so every
+    // index the store already had is repeated here — dropping one silently
+    // would turn a seek into a table scan with nothing to notice it.
+    //
+    // No `.upgrade()` callback: `Account.groupId` is optional, so rows written
+    // before this version are already valid and read as ungrouped. Migrating
+    // them to an explicit null would rewrite every account row outside the
+    // ledger — a write with no operation behind it, which is exactly the
+    // divergence the operation log exists to prevent.
+    this.version(6).stores({
+      accountGroups: 'id, name, type, order, archived',
+      accounts: 'id, name, kind, archived, groupId',
     });
   }
 }

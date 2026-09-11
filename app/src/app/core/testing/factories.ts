@@ -1,5 +1,6 @@
 import {
   Account,
+  AccountGroup,
   Budget,
   Category,
   ExchangeRate,
@@ -21,6 +22,21 @@ export function anAccount(overrides: Partial<Account> = {}): Account {
     archived: false,
     colour: '#3880ff',
     icon: 'card',
+    createdAt: 1_700_000_000_000,
+    updatedAt: '',
+    ...overrides,
+  };
+}
+
+export function anAccountGroup(overrides: Partial<AccountGroup> = {}): AccountGroup {
+  return {
+    id: 'grp-1',
+    name: 'Cards',
+    type: 'credit-card',
+    order: 0,
+    colour: '#3880ff',
+    icon: 'card',
+    archived: false,
     createdAt: 1_700_000_000_000,
     updatedAt: '',
     ...overrides,

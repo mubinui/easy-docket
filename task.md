@@ -31,7 +31,7 @@ Every task follows the same loop, and none of it is optional:
 | 6 | Release readiness | ✅ Done |
 | 7 | Account groups & credit cards | ⏳ In progress |
 
-Tests today: **552 client unit**, **59 end-to-end**, **95 Go**.
+Tests today: **565 client unit**, **59 end-to-end**, **95 Go**.
 
 ---
 
@@ -786,28 +786,47 @@ transaction field and no new kind: what it adds is knowing *how much* to pay and
 a one-tap way to record it. A separate "payment" concept would be a second way
 to spell a transfer, and every report would then have to know about both.
 
-### 7.1 Schema and entity
+### 7.1 Schema and entity ✅
 
-- [ ] `AccountGroup` and `AccountGroupType` in `core/models/domain.ts`
-- [ ] `Account.groupId` — optional, following the `Transaction.rate` precedent,
+- [x] `AccountGroup` and `AccountGroupType` in `core/models/domain.ts`
+- [x] `Account.groupId` — optional, following the `Transaction.rate` precedent,
       so existing rows need no migration and simply read as ungrouped
-- [ ] Dexie `version(6)`: an `accountGroups` table, and `groupId` added to the
+- [x] Dexie `version(6)`: an `accountGroups` table, and `groupId` added to the
       `accounts` indexes so "the accounts in this group" is one seek
-- [ ] `'accountGroups'` in `ENTITY_NAMES` / `EntityMap`
+- [x] `'accountGroups'` in `ENTITY_NAMES` / `EntityMap`
 
-**Tests**
-- [ ] `docket-db.spec.ts` — a v5 database upgrades to v6 with every existing row
-      intact and accounts reading as ungrouped; a fresh install gets all eight
-      entity tables; the new indexes are as specified
-- [ ] `ledger.service.spec.ts` — put / remove / merge / concurrent-edit
-      resolution for groups
-- [ ] `sync.service.spec.ts` — a group replicates between two devices, and so
-      does an account's group membership
+**Tests** (13 added, 552 → 565)
+- [x] `docket-db.spec.ts` — a hand-built v5 database upgrades to v6 with
+      accounts, transactions, budgets, settings, meta and oplog rows intact;
+      a legacy account reads as ungrouped *and does not carry the key at all*;
+      a fresh install gets all eleven tables; group and account indexes as
+      specified; the accounts of a group come back by index
+- [x] `ledger.service.spec.ts` — put / remove / merge / concurrent-edit
+      resolution for groups, filing an account into one, and proof the ledger
+      does not cascade a group deletion onto its accounts
+- [x] `sync.service.spec.ts` — a group and an account's membership replicate,
+      both encrypted; a deletion propagates without taking accounts with it;
+      two devices that file the same account into different groups converge on
+      one group rather than leaving it in both
 
-*Prediction to check: this should touch `domain.ts` and `docket-db.ts` and
-nothing else. 2.1 made the same prediction and found a hardcoded table list.
-If any sync or crypto file has to change, that is a leaked abstraction and the
-fix is structural, not local.*
+**The prediction held.** Only `domain.ts` and `docket-db.ts` changed. Nothing in
+`ledger.service.ts`, `sync.service.ts`, the crypto layer, the envelope or any
+adapter needed a line — which is what 2.1's structural fix bought, and this is
+the fourth entity to collect on it.
+
+**Checked against a real browser, not just fake-indexeddb.** A v5 database was
+built with raw IndexedDB in Chrome, seeded, and then opened by the built app:
+it upgraded cleanly, all eleven stores appeared, `accounts` kept `name`, `kind`
+and `archived` alongside the new `groupId`, and the legacy row came back byte
+for byte with no `groupId` key. `fake-indexeddb` is a reimplementation, and the
+whole point of the stub lesson below is that a reimplementation agrees with
+whatever you wrote.
+
+**Two fields could have answered "is this a credit card?"** `AccountKind`
+already had a `card` value labelled "Credit card". Rather than leave two fields
+racing to answer the same question, `AccountKind` is now documented as
+presentation only — it picks the icon and the label — and the group's type is
+the sole authority on behaviour.
 
 ### 7.2 Groups service and CRUD
 
