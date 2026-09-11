@@ -25,12 +25,12 @@ Every task follows the same loop, and none of it is optional:
 | --- | --- | --- |
 | 1 | Core ledger | ✅ Done |
 | 2 | Budgets | ✅ Done |
-| 3 | Reports | 🔄 In progress — 3.1, 3.2 done |
-| 4 | Recurring transactions | ⬜ Planned |
+| 3 | Reports | ✅ Done |
+| 4 | Recurring transactions | ⬜ Next |
 | 5 | Multi-currency | ⬜ Planned |
 | 6 | Release readiness | 🔄 6.5 done |
 
-Tests today: **310 client unit**, **26 end-to-end**, **84 Go**.
+Tests today: **335 client unit**, **33 end-to-end**, **84 Go**.
 
 ---
 
@@ -184,7 +184,7 @@ component tests for it must supply one.
 
 ---
 
-## Phase 3 — Reports 🔄
+## Phase 3 — Reports ✅
 
 Goal: answer "where did it go, and is that normal?" — derived entirely from
 transactions, so no new storage.
@@ -279,15 +279,48 @@ comparable), and category labels used the muted axis token, which sits around
 now use a secondary-ink token. Worth repeating the lesson: the validator checks
 colour, the tests check geometry, and neither of them can see the chart.
 
-### 3.3 Reports screen
-- [ ] Range picker, chart selection, per-category drill-down
-- [ ] CSV export of the current view
+### 3.3 Reports screen ✅
 
-**Tests** — CSV escaping (commas, quotes, newlines in notes and payees).
+- [x] `features/reports/reports.page.ts` at `/reports`, reached from the Summary
+      screen's "Where it went" card
+- [x] One filter row of range presets scoping every card beneath it
+- [x] Totals, the three charts, and a top-payees list
+- [x] "Show data" reveals the table twins that were already there for assistive
+      technology
+- [x] CSV export of the current view, via `core/reports/csv.ts` and a
+      `FileExportService` that downloads on the web and hands the file to the
+      share sheet on Android
+
+**Tests** (25 added, 310 → 335; 7 end-to-end, 26 → 33)
+- [x] CSV: quoting for commas, embedded quotes and line breaks; CRLF line
+      endings; a header row alone when there is nothing to report; and formula
+      injection neutralised — a note beginning `=` would otherwise execute when
+      the file is opened
+- [x] Ranges: every preset ends today rather than at a future month boundary,
+      whole-month starts, year boundaries
+- [x] Service: aggregation over the live ledger, currency following the
+      accounts, re-aggregation when the range changes, deleted categories named
+      rather than blank, net worth counting history from before the range
+- [x] End-to-end: the empty state, three cards rendering, totals naming a
+      shortfall as "overspent", top payees, the filter row scoping everything,
+      the table twins revealing on request, and a real CSV download whose
+      contents are asserted
+
+**What looking at it found.** With a single month of history the net-worth card
+drew one dot in an empty plot with its label stranded at the far edge — the
+shape of a chart that failed to render rather than a ledger that is new. A lone
+value is a number, not a trend, so the component now shows it as one:
+"$5,049.31 · Sep 2026 · not enough history for a trend yet". `e2e/screenshot.spec.ts`
+keeps that check repeatable (`REPORT_SHOTS=/tmp npx playwright test e2e/screenshot.spec.ts`),
+and skips itself otherwise.
+
+**Deferred deliberately.** Per-category drill-down. The category bars plus the
+payee list answer "where did it go" without it, and a drill-down needs a
+filtered transaction view that the Activity screen already provides.
 
 ---
 
-## Phase 4 — Recurring transactions
+## Phase 4 — Recurring transactions ⬅ next
 
 Goal: rent, salary and subscriptions appear without being typed monthly.
 
@@ -388,7 +421,8 @@ Real, currently unaddressed, and each one has a home above.
 | Single currency assumed in UI totals | Dashboard uses the first account's currency | Phase 5 |
 | Category deletion leaves transactions uncategorised | Silent, no warning | Small fix, fold into 2.3 |
 | ~~Deleting a category leaves it referenced in `Budget.categoryIds`~~ | — | ✅ Closed in 2.2 |
-| `BudgetsService.statuses` reads the whole transaction table | Fine for a personal ledger, wrong for a large one | Unscheduled; revisit with reports (Phase 3), which needs windowed queries anyway |
+| `BudgetsService.statuses` and `ReportsService` read the whole transaction table | Fine for a personal ledger, wrong for a large one | Still open. Net worth genuinely needs the whole history, so a windowed query only helps the other aggregations; worth doing when a ledger large enough to notice exists |
+| Reports have no per-category drill-down | Tapping a bar does nothing | Unscheduled; the Activity screen already filters by category |
 | Android build needs JDK 21 | JDK 25 is rejected by this Gradle | Documented in `docs/DEPLOYMENT.md`; revisit on Gradle upgrade |
 
 ---

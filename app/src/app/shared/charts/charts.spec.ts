@@ -205,16 +205,16 @@ describe('TrendLineChartComponent', () => {
     expect(overdrawn.nativeElement.querySelector('.zero')).not.toBeNull();
   });
 
-  it('renders a single reading without a line', () => {
+  it('shows a single reading as a number, not a one-point plot', () => {
+    // A lone dot in an empty plot reads as a chart that failed to render.
     const single = render(TrendLineChartComponent, {
-      rows: [{ id: 'a', label: 'Jan', value: 1_000 }],
+      rows: [{ id: 'a', label: 'January', value: 1_000 }],
+      currency: 'USD',
     });
-    // Mid-plot horizontally, because a lone dot against the left edge reads as
-    // a line that failed to draw. Vertically it sits at its true position: the
-    // axis runs 0 to 1,000, so the only reading is at the top of it.
-    expect(single.nativeElement.querySelector('.line').getAttribute('d')).toBe('M160 0');
-    // No area beneath a single point: there is no span to fill.
-    expect(single.nativeElement.querySelector('.area')).toBeNull();
+
+    expect(single.nativeElement.querySelector('svg')).toBeNull();
+    expect(single.nativeElement.textContent).toContain('$10.00');
+    expect(single.nativeElement.textContent).toContain('not enough history');
   });
 
   it('carries a table twin', () => {

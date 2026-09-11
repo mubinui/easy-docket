@@ -48,6 +48,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/budgets/budgets.page').then((m) => m.BudgetsPage),
   },
   {
+    path: 'reports',
+    canActivate: [vaultGuard],
+    loadComponent: () => import('./features/reports/reports.page').then((m) => m.ReportsPage),
+  },
+  {
     path: 'settings/sync',
     canActivate: [vaultGuard],
     loadComponent: () =>

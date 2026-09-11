@@ -160,6 +160,12 @@ import {
               <ion-note>No spending recorded this month yet.</ion-note>
             </div>
           }
+
+          <ion-list lines="none">
+            <ion-item button [routerLink]="['/reports']" detail="true">
+              <ion-label color="primary"><h3>Reports</h3></ion-label>
+            </ion-item>
+          </ion-list>
         </ion-card-content>
       </ion-card>
 

@@ -86,6 +86,19 @@ const PLOT_HEIGHT = 120;
         padding: 1.5rem 0;
         margin: 0;
       }
+      .tile {
+        padding: 0.5rem 0 1rem;
+      }
+      .tile strong {
+        display: block;
+        font-size: 1.75rem;
+        font-weight: 600;
+        line-height: 1.1;
+      }
+      .tile span {
+        font-size: 0.75rem;
+        color: var(--viz-ink-secondary);
+      }
       table {
         border-collapse: collapse;
         width: 100%;
@@ -114,7 +127,17 @@ const PLOT_HEIGHT = 120;
     `,
   ],
   template: `
-    @if (points().length) {
+    @if (rows().length === 1) {
+      <!--
+        One reading is a number, not a trend. Plotting it would put a lone dot
+        in an empty plot with its label stranded at the far edge — the shape of
+        a chart that failed to render rather than of a ledger that is new.
+      -->
+      <div class="tile">
+        <strong>{{ money(rows()[0].value) }}</strong>
+        <span>{{ rows()[0].label }} · not enough history for a trend yet</span>
+      </div>
+    } @else if (points().length) {
       <figure>
         <svg
           #plot

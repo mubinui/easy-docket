@@ -177,7 +177,10 @@ export async function addExpense(
   await fillField(page, 'Payee', payee);
   await tap(page, 'Save');
 
-  await expect(page.locator(Screen.transactions).getByRole('heading', { name: payee })).toBeVisible();
+  // `.first()`: the same payee may legitimately appear several times in a list.
+  await expect(
+    page.locator(Screen.transactions).getByRole('heading', { name: payee }).first(),
+  ).toBeVisible();
 }
 
 function escapeForRegExp(value: string): string {
