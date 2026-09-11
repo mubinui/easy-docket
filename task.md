@@ -24,13 +24,13 @@ Every task follows the same loop, and none of it is optional:
 | Phase | Scope | State |
 | --- | --- | --- |
 | 1 | Core ledger | ✅ Done |
-| 2 | Budgets | 🔄 In progress — 2.1–2.3 done |
-| 3 | Reports | ⬜ Planned |
+| 2 | Budgets | ✅ Done |
+| 3 | Reports | ⬜ Next |
 | 4 | Recurring transactions | ⬜ Planned |
 | 5 | Multi-currency | ⬜ Planned |
 | 6 | Release readiness | ⬜ Planned |
 
-Tests today: **192 client**, **84 Go**.
+Tests today: **204 client**, **84 Go**.
 
 ---
 
@@ -49,7 +49,7 @@ Tests today: **192 client**, **84 Go**.
 
 ---
 
-## Phase 2 — Budgets 🔄
+## Phase 2 — Budgets ✅
 
 Goal: set a spending limit per category per period, and see progress against it
 without opening a report.
@@ -154,19 +154,37 @@ tying display order to the schema would mean a migration to reorder a list.
 All within limit"). Task 2.4 replaces it with the card showing the budgets
 closest to their limits.
 
-### 2.4 Dashboard integration ⬅ next
+### 2.4 Dashboard integration ✅
 
-- [ ] Replace the placeholder Summary row with a card showing the two or three
-      budgets closest to their limits, with remaining amounts and bars
-- [ ] Keep the empty state pointing at budget creation
-- [ ] Over-budget budgets called out rather than buried
+- [x] Summary card showing the three budgets closest to their limits
+- [x] Empty state pointing at budget creation
+- [x] Over-budget called out with an `OVER` flag and the amount, in danger colour
+- [x] `shared/budget-bar.component.ts` extracted so the card and the list cannot
+      drift apart — a budget that read as comfortable on one screen and alarming
+      on the other would be worse than no bar at all
 
-**Tests** — ordering by proximity to limit; empty state when none exist; the
-card reflecting a budget crossing its limit.
+**Tests** (12 added, 192 → 204)
+- [x] Empty state; remaining amount; over-budget presented as a positive figure
+      ("over by $25.00", never "over by -$25.00"); urgency ordering; the
+      three-budget cap; the summarising link label and its pluralisation;
+      budgets that have not started yet excluded
+- [x] Bar component: fill proportion, colour, and its ARIA description
+- [x] Browser-verified: `$150.00 left`, then `OVER · over by $25.00 · 1 budget
+      over its limit` after overspending
+
+**What it found.** The first over-budget test asserted against the whole page
+and passed for the wrong reason — the `-$` it was checking for came from net
+worth in a different card. Assertions are now scoped to the budget card via a
+`budgetCardText()` helper. Worth remembering for Phase 3: the Summary screen has
+several cards, and a page-wide `textContent` assertion proves very little.
+
+Also: the Summary screen reaches `VaultService` through the sync indicator, and
+`SecureStore` is provided at bootstrap rather than from the root injector, so
+component tests for it must supply one.
 
 ---
 
-## Phase 3 — Reports
+## Phase 3 — Reports ⬅ next
 
 Goal: answer "where did it go, and is that normal?" — derived entirely from
 transactions, so no new storage.

@@ -79,8 +79,12 @@ describe('BudgetsPage', () => {
 
     const [status] = page.statuses();
     expect(status.progress?.over).toBe(true);
-    expect(page.barColour(true)).toContain('danger');
     expect(fixture.nativeElement.textContent).toContain('over by');
+
+    // The bar itself is a shared component with its own tests; here we only
+    // check the page hands it the over-budget state.
+    const bar = fixture.nativeElement.querySelector('app-budget-bar .bar span') as HTMLElement;
+    expect(bar.style.background).toContain('danger');
   });
 
   it('separates archived budgets from active ones', async () => {

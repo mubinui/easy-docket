@@ -13,6 +13,7 @@ import { CategoriesService } from '../../core/repositories/categories.service';
 import { TransactionsService } from '../../core/repositories/transactions.service';
 import { SyncSchedulerService } from '../../core/sync/sync-scheduler.service';
 import { SyncStatusComponent } from '../../shared/sync-status.component';
+import { BudgetBarComponent } from '../../shared/budget-bar.component';
 import { MoneyPipe } from '../../shared/money.pipe';
 import {
   IonCard,
@@ -40,7 +41,7 @@ import {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, MoneyPipe, SyncStatusComponent, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonNote, IonRefresher, IonRefresherContent, IonTitle, IonToolbar],
+  imports: [RouterLink, MoneyPipe, BudgetBarComponent, SyncStatusComponent, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonNote, IonRefresher, IonRefresherContent, IonTitle, IonToolbar],
   styles: [
     `
       .net-worth {
@@ -75,6 +76,16 @@ import {
       .empty {
         text-align: center;
         padding: 2rem 1rem;
+      }
+      .budget-name {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+      .budget-name ion-note {
+        font-size: 0.7rem;
+        letter-spacing: 0.04em;
       }
     `,
   ],
@@ -157,21 +168,49 @@ import {
           <ion-card-title>Budgets</ion-card-title>
         </ion-card-header>
         <ion-card-content>
-          <ion-list lines="none">
-            <ion-item button [routerLink]="['/budgets']" detail="true">
-              <ion-label>
-                @if (budgetCount()) {
-                  <h3>{{ budgetCount() }} active</h3>
-                  <p>
-                    {{ overspentCount() ? overspentCount() + ' over budget' : 'All within limit' }}
-                  </p>
-                } @else {
+          @if (headline().length) {
+            <ion-list lines="none">
+              @for (status of headline(); track status.budget.id) {
+                <ion-item button [routerLink]="['/budgets']">
+                  <ion-label>
+                    <div class="budget-name">
+                      <h3>{{ status.budget.name }}</h3>
+                      @if (status.progress!.over) {
+                        <ion-note color="danger">OVER</ion-note>
+                      }
+                    </div>
+                    <app-budget-bar
+                      [share]="status.progress!.share"
+                      [over]="status.progress!.over"
+                    />
+                    <ion-note [color]="status.progress!.over ? 'danger' : 'medium'">
+                      @if (status.progress!.over) {
+                        over by
+                        {{ -status.progress!.remaining | money: status.budget.currency }}
+                      } @else {
+                        {{ status.progress!.remaining | money: status.budget.currency }} left
+                      }
+                    </ion-note>
+                  </ion-label>
+                </ion-item>
+              }
+
+              <ion-item button [routerLink]="['/budgets']" detail="true">
+                <ion-label color="primary">
+                  <h3>{{ viewAllLabel() }}</h3>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+          } @else {
+            <ion-list lines="none">
+              <ion-item button [routerLink]="['/budgets']" detail="true">
+                <ion-label>
                   <h3>Set a spending limit</h3>
-                  <p>Track a category against a monthly or weekly budget</p>
-                }
-              </ion-label>
-            </ion-item>
-          </ion-list>
+                  <p>Track a category against a weekly or monthly budget</p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+          }
         </ion-card-content>
       </ion-card>
 
@@ -217,10 +256,30 @@ export class DashboardPage {
 
   readonly recent = computed(() => this.transactions.visible().slice(0, 5));
 
-  // Task 2.4 turns this into a card showing the budgets nearest their limit;
-  // for now the Summary screen just has to be able to reach the budgets page.
+  /**
+   * The few budgets worth seeing without opening the budgets screen: those
+   * closest to their limits. Three is the most that fits before the card starts
+   * competing with the rest of the summary for attention.
+   */
+  readonly headline = computed(() =>
+    this.budgets
+      .byUrgency()
+      .filter((status) => status.progress !== null)
+      .slice(0, 3),
+  );
+
   readonly budgetCount = computed(() => this.budgets.statuses().length);
   readonly overspentCount = computed(() => this.budgets.overspent().length);
+
+  /** Says what the rest of the list holds, rather than a bare "View all". */
+  readonly viewAllLabel = computed(() => {
+    const remaining = this.budgetCount() - this.headline().length;
+    const over = this.overspentCount();
+
+    if (remaining > 0) return `View all ${this.budgetCount()} budgets`;
+    if (over > 0) return over === 1 ? '1 budget over its limit' : `${over} budgets over their limit`;
+    return 'All budgets within their limits';
+  });
 
   /** Top five spending categories, with each one's share of the largest. */
   readonly topCategories = computed(() => {

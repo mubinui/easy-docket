@@ -27,6 +27,7 @@ import { Budget } from '../../core/models/domain';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { BudgetsService } from '../../core/repositories/budgets.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
+import { BudgetBarComponent } from '../../shared/budget-bar.component';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { BudgetEditorComponent } from './budget-editor.component';
 
@@ -35,6 +36,7 @@ import { BudgetEditorComponent } from './budget-editor.component';
   standalone: true,
   imports: [
     MoneyPipe,
+    BudgetBarComponent,
     BudgetEditorComponent,
     IonHeader,
     IonToolbar,
@@ -56,18 +58,6 @@ import { BudgetEditorComponent } from './budget-editor.component';
   ],
   styles: [
     `
-      .bar {
-        height: 8px;
-        border-radius: 4px;
-        background: var(--ion-color-step-150, #e6e6e6);
-        overflow: hidden;
-        margin: 0.4rem 0 0.2rem;
-      }
-      .bar span {
-        display: block;
-        height: 100%;
-        transition: width 200ms ease;
-      }
       .row {
         display: flex;
         justify-content: space-between;
@@ -103,12 +93,7 @@ import { BudgetEditorComponent } from './budget-editor.component';
                 <h3>{{ status.budget.name }}</h3>
 
                 @if (status.progress; as progress) {
-                  <div class="bar">
-                    <span
-                      [style.width.%]="progress.share"
-                      [style.background]="barColour(progress.over)"
-                    ></span>
-                  </div>
+                  <app-budget-bar [share]="progress.share" [over]="progress.over" />
                   <div class="row">
                     <span>
                       {{ progress.spent | money: status.budget.currency }} of
@@ -211,10 +196,6 @@ export class BudgetsPage {
     return status.progress
       ? describeWindow(status.budget.period, status.progress.window)
       : `Starts ${status.budget.startDate}`;
-  }
-
-  barColour(over: boolean): string {
-    return over ? 'var(--ion-color-danger)' : 'var(--ion-color-success)';
   }
 
   absolute(amount: number): number {
