@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { BiometricAvailability, BiometricService } from '../../core/keys/biometric.service';
 import { VaultService } from '../../core/keys/vault.service';
 import {
   IonBackButton,
@@ -58,6 +59,31 @@ import {
           </ion-note>
         </ion-item>
       </ion-list>
+
+      @if (biometrics(); as check) {
+        <ion-list>
+          <ion-list-header><ion-label>Device lock</ion-label></ion-list-header>
+
+          @if (check.available) {
+            <ion-item>
+              <ion-toggle [ngModel]="biometricLock()" (ngModelChange)="setBiometricLock($event)">
+                Require {{ check.kind }} to open
+              </ion-toggle>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-note>
+                Your key stays in the device keystore either way. This asks the device to check
+                you are the one holding it before the ledger opens — without it, a phone found
+                unlocked is a ledger left open. Your passphrase still works if the check fails.
+              </ion-note>
+            </ion-item>
+          } @else {
+            <ion-item lines="none">
+              <ion-note>{{ check.reason }}.</ion-note>
+            </ion-item>
+          }
+        </ion-list>
+      }
 
       <ion-list>
         <ion-list-header><ion-label>Change passphrase</ion-label></ion-list-header>
@@ -145,11 +171,46 @@ export class SecurityPage {
   private readonly toasts = inject(ToastController);
   private readonly router = inject(Router);
 
+  private readonly biometricService = inject(BiometricService);
+
+  readonly biometrics = signal<BiometricAvailability | null>(null);
+  readonly biometricLock = signal(false);
+
   readonly current = signal('');
   readonly next = signal('');
   readonly confirmation = signal('');
   readonly error = signal<string | null>(null);
   readonly bundle = signal<string | null>(null);
+
+  constructor() {
+    void this.loadBiometrics();
+  }
+
+  private async loadBiometrics(): Promise<void> {
+    this.biometrics.set(await this.biometricService.availability());
+    this.biometricLock.set(await this.biometricService.isEnabled());
+  }
+
+  /**
+   * Turning it on verifies once, immediately.
+   *
+   * Enabling a lock that then refuses to open would strand the user behind a
+   * check that does not work, so it is proved before it is trusted.
+   */
+  async setBiometricLock(enabled: boolean): Promise<void> {
+    if (enabled && !(await this.biometricService.verify('Confirm it works'))) {
+      this.biometricLock.set(false);
+      const toast = await this.toasts.create({
+        message: 'That check did not pass, so nothing has changed',
+        duration: 2500,
+      });
+      await toast.present();
+      return;
+    }
+
+    await this.biometricService.setEnabled(enabled);
+    this.biometricLock.set(enabled);
+  }
 
   canChange(): boolean {
     return this.current().length > 0 && this.next().length >= 8;

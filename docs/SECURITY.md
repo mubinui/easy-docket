@@ -109,6 +109,24 @@ crypto implementation rather than byte arrays sitting in the JavaScript heap.
 `VaultService.keyIsDurable` exposes the difference, and both the unlock screen
 and the security settings page explain it in the user's own terms.
 
+### The device check
+
+On Android the key survives a restart, which is the right default for everyday
+use and the wrong one for a phone found unlocked — at that point the ledger is
+simply open. Settings → Security offers a fingerprint, face or device-credential
+check in front of the stored key.
+
+It is worth being precise about what that is and is not. It is **not** a second
+layer of encryption: the key is already held in the hardware keystore, and this
+is a presence check on whoever is holding the phone. A refused check leaves the
+vault locked, and the passphrase still opens it — a convenience gate that could
+lock someone out of their own ledger would be a worse bargain than the one it
+improves on.
+
+Enabling it verifies once immediately, so a check that does not work cannot be
+switched on. The plugin declares `USE_BIOMETRIC` and `USE_FINGERPRINT`, which a
+Play Store listing has to account for.
+
 ### Locking
 
 `lock()` drops the in-memory key and evicts it from the keystore, so a stolen

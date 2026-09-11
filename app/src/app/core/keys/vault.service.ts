@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Preferences } from '@capacitor/preferences';
 import { CryptoService, WrappedMasterKey, fromBase64, toBase64 } from '../crypto/crypto.service';
+import { BiometricService } from './biometric.service';
 import { SecureStore } from './secure-store';
 
 /**
@@ -37,6 +38,7 @@ export class VaultLockedError extends Error {
 export class VaultService {
   private readonly crypto = inject(CryptoService);
   private readonly secureStore = inject(SecureStore);
+  private readonly biometrics = inject(BiometricService);
 
   private masterKey: CryptoKey | null = null;
   private readonly state = signal<VaultState>('uninitialised');
@@ -75,12 +77,24 @@ export class VaultService {
     }
 
     const stashed = await this.secureStore.get(SECURE_MASTER_KEY);
-    if (stashed) {
-      this.masterKey = await this.crypto.importMasterKey(fromBase64(stashed));
-      this.state.set('unlocked');
-    } else {
+    if (!stashed) {
       this.state.set('locked');
+      return this.state();
     }
+
+    // A stored key opens the ledger without a passphrase, which is what makes a
+    // found-and-unlocked phone a problem. When the user has asked for it, the
+    // device confirms they are present first; a refusal simply leaves the vault
+    // locked, and the passphrase still works.
+    if (await this.biometrics.isEnabled()) {
+      if (!(await this.biometrics.verify('Unlock Easy Docket'))) {
+        this.state.set('locked');
+        return this.state();
+      }
+    }
+
+    this.masterKey = await this.crypto.importMasterKey(fromBase64(stashed));
+    this.state.set('unlocked');
     return this.state();
   }
 

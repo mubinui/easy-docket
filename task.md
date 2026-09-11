@@ -28,9 +28,9 @@ Every task follows the same loop, and none of it is optional:
 | 3 | Reports | ✅ Done |
 | 4 | Recurring transactions | ✅ Done |
 | 5 | Multi-currency | ✅ Done |
-| 6 | Release readiness | 🔄 6.1, 6.3, 6.5 done |
+| 6 | Release readiness | 🔄 6.1–6.3, 6.5 done |
 
-Tests today: **537 client unit**, **57 end-to-end**, **84 Go**.
+Tests today: **545 client unit**, **57 end-to-end**, **84 Go**.
 
 ---
 
@@ -620,7 +620,28 @@ the vault's reporting currency. Both corrected.
   are not an envelope, and a wrong key now share one explanation, which is also
   the right call for not confirming anything to someone holding a file they
   should not have.
-- [ ] **6.2 Biometric unlock** on Android, gating keystore retrieval.
+- [x] **6.2 Biometric unlock** ✅ — a fingerprint, face or device-credential
+      check in front of the stored key, off by default and offered only where
+      the device can actually do it.
+
+  **What it is, precisely.** Not a second layer of encryption — the key is
+  already in the hardware keystore. It is a presence check on whoever is holding
+  the phone, because a key that survives a restart means a phone found unlocked
+  is a ledger left open. The settings copy says exactly that rather than
+  implying more.
+
+  **A refused check leaves the vault locked, and the passphrase still opens
+  it.** A convenience gate that could lock someone out of their own ledger would
+  be a worse bargain than the one it improves on. Turning it on verifies once
+  immediately, so a check that does not work cannot be switched on.
+
+  Nothing changes on the web, where there is no stored key to protect: the
+  browser build holds the key for one session and already asks every time.
+
+  **Tests** (8 added, 537 → 545) — the check not asked for until enabled, a
+  refusal leaving the vault locked, the passphrase still working afterwards, and
+  the web build degrading to "unavailable" rather than throwing. The Android APK
+  was rebuilt and carries `USE_BIOMETRIC`.
 - [x] **6.3 Oplog compaction** ✅ — snapshots, so joining a long-lived vault no
       longer means replaying every batch ever written.
 

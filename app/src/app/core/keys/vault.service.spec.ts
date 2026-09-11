@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Preferences } from '@capacitor/preferences';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CryptoService, WrappedMasterKey } from '../crypto/crypto.service';
+import { BiometricService } from './biometric.service';
 import { MemorySecureStore, SecureStore } from './secure-store';
 import { VaultService } from './vault.service';
 
@@ -11,10 +12,39 @@ import { VaultService } from './vault.service';
  * That is deliberately the weaker of the two platforms — if the key never
  * reaches disk here, it never reaches disk anywhere.
  */
-async function makeVault(store: SecureStore = new MemorySecureStore()): Promise<VaultService> {
+/** A stand-in for the device check, so its two outcomes can both be exercised. */
+class StubBiometrics {
+  enabled = false;
+  verdict = true;
+  prompts = 0;
+
+  async availability() {
+    return { available: true as const, kind: 'Fingerprint' };
+  }
+  async isEnabled(): Promise<boolean> {
+    return this.enabled;
+  }
+  async setEnabled(enabled: boolean): Promise<void> {
+    this.enabled = enabled;
+  }
+  async verify(): Promise<boolean> {
+    this.prompts++;
+    return this.verdict;
+  }
+}
+
+async function makeVault(
+  store: SecureStore = new MemorySecureStore(),
+  biometrics: StubBiometrics = new StubBiometrics(),
+): Promise<VaultService> {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
-    providers: [VaultService, CryptoService, { provide: SecureStore, useValue: store }],
+    providers: [
+      VaultService,
+      CryptoService,
+      { provide: SecureStore, useValue: store },
+      { provide: BiometricService, useValue: biometrics },
+    ],
   });
   const vault = TestBed.inject(VaultService);
   await vault.initialise();
@@ -148,6 +178,60 @@ describe('VaultService', () => {
       await expect(restarted.unlock('wrong passphrase')).rejects.toThrow(/Incorrect passphrase/);
       expect(restarted.status()).toBe('locked');
       expect(() => restarted.requireKey()).toThrow(/locked/);
+    });
+  });
+
+  describe('the device check', () => {
+    it('is not asked for when it has not been turned on', async () => {
+      const store = new DurableStore();
+      const biometrics = new StubBiometrics();
+
+      await (await makeVault(store, biometrics)).create(PASSPHRASE);
+      await makeVault(store, biometrics);
+
+      expect(biometrics.prompts).toBe(0);
+    });
+
+    it('stands between a stored key and the ledger', async () => {
+      // Without it, a phone found unlocked is a ledger left open.
+      const store = new DurableStore();
+      const biometrics = new StubBiometrics();
+      biometrics.enabled = true;
+
+      await (await makeVault(store, biometrics)).create(PASSPHRASE);
+      const restarted = await makeVault(store, biometrics);
+
+      expect(biometrics.prompts).toBe(1);
+      expect(restarted.status()).toBe('unlocked');
+    });
+
+    it('leaves the vault locked when the check is refused', async () => {
+      const store = new DurableStore();
+      const biometrics = new StubBiometrics();
+      biometrics.enabled = true;
+
+      await (await makeVault(store, biometrics)).create(PASSPHRASE);
+      biometrics.verdict = false;
+      const restarted = await makeVault(store, biometrics);
+
+      expect(restarted.status()).toBe('locked');
+      expect(() => restarted.requireKey()).toThrow(/locked/);
+    });
+
+    it('still opens with the passphrase after a refused check', async () => {
+      // The check is a convenience gate, not a second key: refusing it must not
+      // lock someone out of their own ledger.
+      const store = new DurableStore();
+      const biometrics = new StubBiometrics();
+      biometrics.enabled = true;
+
+      await (await makeVault(store, biometrics)).create(PASSPHRASE);
+      biometrics.verdict = false;
+
+      const restarted = await makeVault(store, biometrics);
+      await restarted.unlock(PASSPHRASE);
+
+      expect(restarted.status()).toBe('unlocked');
     });
   });
 
