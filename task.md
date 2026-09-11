@@ -29,6 +29,7 @@ Every task follows the same loop, and none of it is optional:
 | 4 | Recurring transactions | ✅ Done |
 | 5 | Multi-currency | ✅ Done |
 | 6 | Release readiness | ✅ Done |
+| 7 | Account groups & credit cards | ⏳ In progress |
 
 Tests today: **552 client unit**, **59 end-to-end**, **95 Go**.
 
@@ -756,6 +757,111 @@ the vault's reporting currency. Both corrected.
   component selector (`app-accounts`) because Ionic keeps departed pages in the
   DOM. The sync spec reads the server's data directory directly, which is the
   only way to prove the zero-knowledge claim rather than assert it.
+
+---
+
+## Phase 7 — Account groups and credit cards
+
+Accounts today are a flat list. This phase gives them a grouping, gives the
+group a **type**, and uses that type to make credit cards behave like credit
+cards — culminating in paying a card bill.
+
+**The type lives on the group, not the account.** A group named "Cards" with
+type `credit-card` says everything in it is a credit card; an account inherits
+its behaviour from its group and an ungrouped account is `default`. The
+alternative — a type on each account — was rejected because it puts the same
+fact in as many places as there are cards, and the first time the two disagree
+the app has to pick a winner.
+
+**`AccountKind` stays cosmetic.** It already has a `card` value labelled
+"Credit card", which is exactly the sort of overlap that rots. From this phase
+on, `kind` picks the icon and the label and nothing else; every behavioural
+question — is this a card, can it be paid, is a balance a debt — is answered by
+the group's type. Two fields that both claim to answer "is this a credit card?"
+is one field too many.
+
+**A bill payment is an ordinary transfer.** Money leaves the current account and
+lands on the card. The ledger already models that exactly, so 7.5 adds no
+transaction field and no new kind: what it adds is knowing *how much* to pay and
+a one-tap way to record it. A separate "payment" concept would be a second way
+to spell a transfer, and every report would then have to know about both.
+
+### 7.1 Schema and entity
+
+- [ ] `AccountGroup` and `AccountGroupType` in `core/models/domain.ts`
+- [ ] `Account.groupId` — optional, following the `Transaction.rate` precedent,
+      so existing rows need no migration and simply read as ungrouped
+- [ ] Dexie `version(6)`: an `accountGroups` table, and `groupId` added to the
+      `accounts` indexes so "the accounts in this group" is one seek
+- [ ] `'accountGroups'` in `ENTITY_NAMES` / `EntityMap`
+
+**Tests**
+- [ ] `docket-db.spec.ts` — a v5 database upgrades to v6 with every existing row
+      intact and accounts reading as ungrouped; a fresh install gets all eight
+      entity tables; the new indexes are as specified
+- [ ] `ledger.service.spec.ts` — put / remove / merge / concurrent-edit
+      resolution for groups
+- [ ] `sync.service.spec.ts` — a group replicates between two devices, and so
+      does an account's group membership
+
+*Prediction to check: this should touch `domain.ts` and `docket-db.ts` and
+nothing else. 2.1 made the same prediction and found a hardcoded table list.
+If any sync or crypto file has to change, that is a leaked abstraction and the
+fix is structural, not local.*
+
+### 7.2 Groups service and CRUD
+
+- [ ] `AccountGroupsService` — live list ordered by `order` then name, save,
+      archive, delete, reorder
+- [ ] Deleting a group leaves its accounts ungrouped rather than deleting them
+- [ ] Group editor: name, type, colour, icon
+- [ ] Account editor gains a group picker, including "No group"
+
+**Tests**
+- [ ] Unit: ordering, delete-orphans-not-cascades, a group's account list,
+      and that an archived group's accounts stay visible
+- [ ] Component: the editors save what was typed and nothing else
+
+### 7.3 Accounts screen grouped
+
+- [ ] Accounts list rendered by group, with a per-group subtotal in the
+      reporting currency, using the same unconverted-currency handling as net
+      worth
+- [ ] Ungrouped accounts under a final unnamed section, not a fake group
+- [ ] A `credit-card` group reads as money **owed**: a negative balance shows as
+      a positive amount owed, and a subtotal is a total debt
+- [ ] Net worth is unchanged — a card debt already subtracts
+
+**Tests**
+- [ ] Component: grouping, subtotals, the owed framing, ungrouped section
+- [ ] e2e: create a group, put an account in it, see it under that heading with
+      the right subtotal
+
+### 7.4 Card terms
+
+- [ ] `creditLimit`, `statementDay`, `dueDay` on `Account`, all optional, all
+      meaningless unless the account's group is `credit-card`
+- [ ] Editor shows these fields only for an account in a credit-card group
+- [ ] Available credit = limit − balance owed; shown on the account
+
+**Tests**
+- [ ] Unit: statement and due date resolution across month lengths — a
+      statement day of 31 in February, a due day that falls in the next month
+- [ ] Component: the fields appear and disappear with the group type
+
+### 7.5 Pay the bill
+
+- [ ] `core/cards/statement.ts`, pure: given a card's transactions and its
+      terms, the closed statement balance, the current balance, and the due date
+- [ ] "Pay bill" on a credit-card account: pick a funding account, offer
+      statement balance / full balance / custom, record a transfer
+- [ ] Due-soon surfacing on the dashboard
+
+**Tests**
+- [ ] Unit: statement windows, a payment inside the window, a card with no
+      terms set, a card paid twice in one cycle
+- [ ] e2e: spend on a card, pay it from a current account, both balances move by
+      the right amount and net worth is unchanged by the payment
 
 ---
 
