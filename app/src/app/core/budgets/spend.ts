@@ -1,3 +1,4 @@
+import { inReporting } from '../money/conversion';
 import { Budget, Minor, Transaction } from '../models/domain';
 import { BudgetWindow, windowByIndex, windowFor } from './period';
 
@@ -11,6 +12,8 @@ import { BudgetWindow, windowByIndex, windowFor } from './period';
 
 export interface BudgetProgress {
   budget: Budget;
+  /** Transactions in this period with no rate to the budget's currency. */
+  unconverted: number;
   window: BudgetWindow;
   /** The budget's own per-period limit, before any carry. */
   limit: Minor;
@@ -46,13 +49,35 @@ export function spendIn(
   window: BudgetWindow,
   transactions: readonly Transaction[],
 ): Minor {
-  let total = 0;
+  return spendDetail(budget, window, transactions).spent;
+}
+
+/**
+ * Spend in a period, with a count of what could not be converted.
+ *
+ * A budget is denominated in one currency, so spending recorded in another has
+ * to be converted using the rate stored on the transaction. Anything with no
+ * rate is left out and counted, rather than added at face value — treating €45
+ * as $45 would quietly understate the spend and tell the user they are within a
+ * limit they have passed.
+ */
+export function spendDetail(
+  budget: Budget,
+  window: BudgetWindow,
+  transactions: readonly Transaction[],
+): { spent: Minor; unconverted: number } {
+  let spent = 0;
+  let unconverted = 0;
+
   for (const transaction of transactions) {
     if (!countsTowards(budget, transaction)) continue;
     if (transaction.date < window.from || transaction.date > window.to) continue;
-    total += transaction.amount;
+
+    const amount = inReporting(transaction, budget.currency);
+    if (amount === null) unconverted++;
+    else spent += amount;
   }
-  return total;
+  return { spent, unconverted };
 }
 
 /**
@@ -90,11 +115,12 @@ export function progressFor(
 
   const carried = carriedInto(budget, window.index, transactions);
   const allowance = budget.amount + carried;
-  const spent = spendIn(budget, window, transactions);
+  const { spent, unconverted } = spendDetail(budget, window, transactions);
   const remaining = allowance - spent;
 
   return {
     budget,
+    unconverted,
     window,
     limit: budget.amount,
     carried,

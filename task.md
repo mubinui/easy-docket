@@ -27,10 +27,10 @@ Every task follows the same loop, and none of it is optional:
 | 2 | Budgets | ✅ Done |
 | 3 | Reports | ✅ Done |
 | 4 | Recurring transactions | ✅ Done |
-| 5 | Multi-currency | 🔄 In progress — 5.1, 5.2 done |
-| 6 | Release readiness | 🔄 6.5 done |
+| 5 | Multi-currency | ✅ Done |
+| 6 | Release readiness | ⬅ next — 6.5 done |
 
-Tests today: **461 client unit**, **49 end-to-end**, **84 Go**.
+Tests today: **469 client unit**, **51 end-to-end**, **84 Go**.
 
 ---
 
@@ -449,7 +449,7 @@ screen reader. It now reports its state in words: "Synced — tap to sync now",
 
 ---
 
-## Phase 5 — Multi-currency 🔄
+## Phase 5 — Multi-currency ✅
 
 Goal: accounts in different currencies that still roll into one net worth.
 
@@ -536,10 +536,41 @@ browser disagreed. Instrumenting the running app — dumping the editor's comput
 state into a data attribute — showed the account had never changed at all,
 because it was already the default.
 
-### 5.3 Conversion applied
-- [ ] Balances, net worth, budgets and reports converted
-- [ ] Unconverted transactions surfaced, never silently dropped
-- [ ] The currency shown wherever a converted figure is displayed
+### 5.3 Conversion applied ✅
+
+- [x] Reports — every aggregation converts using the rate each transaction
+      carries, and `unconvertedIn` counts what it could not
+- [x] Budgets — `spendDetail` converts to the budget's currency and reports
+      what it left out
+- [x] Net worth and account balances — a foreign balance converts at the latest
+      known rate and is shown in both currencies (`€100.00 · ≈ $110.00`)
+- [x] Activity totals and the Summary card
+- [x] Every screen says what it excluded, in the currency it is missing
+
+**The rule, everywhere: a transaction that cannot be converted is skipped and
+counted, never added at face value.** Treating €45 as $45 would understate a
+total in a way nobody would notice — the user would be told they are inside a
+budget they have passed. So `netWorth` reports which currencies it left out,
+budgets say how many transactions were not counted, and the reports header says
+how many fell outside the total.
+
+**An opening balance is not a dated event.** It is a standing figure, so it
+converts at the latest rate known rather than one from a particular day —
+unlike a transaction, which keeps the rate it was given.
+
+**Tests** (8 unit added, 461 → 469; 2 end-to-end, 49 → 51)
+- [x] Aggregations converting with per-transaction rates, leaving out what has
+      none, and counting it
+- [x] Net worth excluding an account whose currency has no rate
+- [x] Reports expressed in the reporting currency rather than an account's
+- [x] End-to-end: a €100 balance shown as `≈ $110.00` and rolled into a
+      `$1,110.00` headline; and with no rate, a headline of `$1,000.00` beside
+      "Excludes EUR"
+
+**Two of my own expectations were wrong, not the code.** The top-payee test
+assumed a converted €45 would outrank a $100 expense, and a reports test still
+expected the first account's currency after the rule had deliberately changed to
+the vault's reporting currency. Both corrected.
 
 ---
 

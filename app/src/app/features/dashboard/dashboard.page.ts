@@ -9,6 +9,7 @@ import {
 } from 'ionicons/icons';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { BudgetsService } from '../../core/repositories/budgets.service';
+import { RatesService } from '../../core/repositories/rates.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
 import { TransactionsService } from '../../core/repositories/transactions.service';
 import { SyncSchedulerService } from '../../core/sync/sync-scheduler.service';
@@ -109,6 +110,15 @@ import {
         <ion-card-content>
           <p class="net-worth">{{ accounts.netWorth() | money: currency() }}</p>
           <ion-note>across {{ accounts.active().length }} account(s)</ion-note>
+
+          @if (unconvertedAccounts().length) {
+            <!-- Never a silently short total: say which currencies are missing. -->
+            <p>
+              <ion-note color="warning">
+                Excludes {{ unconvertedAccounts().join(', ') }} — no rate recorded
+              </ion-note>
+            </p>
+          }
         </ion-card-content>
       </ion-card>
 
@@ -133,6 +143,14 @@ import {
               </div>
             </div>
           </div>
+
+          @if (transactions.totals().unconverted; as missing) {
+            <p>
+              <ion-note color="warning">
+                {{ missing }} transaction(s) excluded — no exchange rate
+              </ion-note>
+            </p>
+          }
         </ion-card-content>
       </ion-card>
 
@@ -255,10 +273,14 @@ export class DashboardPage {
   readonly categories = inject(CategoriesService);
   readonly transactions = inject(TransactionsService);
   readonly budgets = inject(BudgetsService);
+  readonly rates = inject(RatesService);
   private readonly scheduler = inject(SyncSchedulerService);
 
   /** The currency of the first account; a multi-currency ledger is out of scope for now. */
-  readonly currency = computed(() => this.accounts.active()[0]?.currency ?? 'USD');
+  /** Totals are shown in the vault's reporting currency. */
+  readonly currency = computed(() => this.rates.reportingCurrency());
+
+  readonly unconvertedAccounts = computed(() => this.accounts.netWorthDetail().unconverted);
 
   readonly recent = computed(() => this.transactions.visible().slice(0, 5));
 

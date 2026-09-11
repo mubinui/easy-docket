@@ -89,6 +89,10 @@ import { MoneyPipe } from '../../shared/money.pipe';
         text-align: center;
         padding: 3rem 1.5rem;
       }
+      .unconverted {
+        text-align: center;
+        margin: 0.75rem 0 0;
+      }
       .actions {
         display: flex;
         gap: 0.5rem;
@@ -151,6 +155,15 @@ import { MoneyPipe } from '../../shared/money.pipe';
                 <ion-note>{{ data().totals.net < 0 ? 'overspent' : 'saved' }}</ion-note>
               </div>
             </div>
+
+            @if (data().unconverted; as missing) {
+              <p class="unconverted">
+                <ion-note color="warning">
+                  {{ missing }} transaction(s) left out — no rate to
+                  {{ data().currency }}
+                </ion-note>
+              </p>
+            }
           </ion-card-content>
         </ion-card>
 

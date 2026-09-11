@@ -107,6 +107,16 @@ import { BudgetEditorComponent } from './budget-editor.component';
                   </div>
                   <p>{{ describe(status) }}</p>
 
+                  @if (progress.unconverted) {
+                    <div class="warning">
+                      <ion-icon name="alert-circle-outline" color="warning" />
+                      <ion-text color="warning">
+                        {{ progress.unconverted }} transaction(s) not counted — no rate to
+                        {{ status.budget.currency }}
+                      </ion-text>
+                    </div>
+                  }
+
                   @if (progress.carried !== 0) {
                     <p>
                       {{ progress.carried > 0 ? 'Carried in' : 'Carried over from overspending' }}:

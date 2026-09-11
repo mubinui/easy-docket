@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { liveQuery } from 'dexie';
 import { from } from 'rxjs';
 import { DOCKET_DB } from '../db/db.token';
+import { RatesService } from '../repositories/rates.service';
 import { DocketDb } from '../db/docket-db';
 import { Account, Category, Transaction } from '../models/domain';
 import { DateRange, currentMonth, formatMonth, toIsoDate } from '../util/dates';
@@ -16,6 +17,7 @@ import {
   spendByCategory,
   topPayees,
   totalsFor,
+  unconvertedIn,
 } from './aggregate';
 
 /** The ranges offered in the reports filter row. */
@@ -43,6 +45,8 @@ export interface ReportData {
   payees: PayeeTotal[];
   totals: { income: number; expense: number; net: number };
   currency: string;
+  /** Transactions in the range with no rate to the reporting currency. */
+  unconverted: number;
 }
 
 /**
@@ -57,6 +61,7 @@ export interface ReportData {
 @Injectable({ providedIn: 'root' })
 export class ReportsService {
   private readonly db: DocketDb = inject(DOCKET_DB);
+  private readonly rates = inject(RatesService);
 
   readonly preset = signal<RangePreset>('month');
 
@@ -89,16 +94,19 @@ export class ReportsService {
   readonly data = computed<ReportData>(() => {
     const { transactions, accounts } = this.ledger();
     const range = this.range();
+    const reporting = this.rates.reportingCurrency();
 
     return {
       range,
-      categories: spendByCategory(transactions, range),
-      flow: flowByMonth(transactions, range),
-      netWorth: netWorthOver(accounts, transactions, range),
-      payees: topPayees(transactions, range, 8),
-      totals: totalsFor(transactions, range),
-      // Single-currency for now; the first account's currency is the ledger's.
-      currency: accounts[0]?.currency ?? 'USD',
+      categories: spendByCategory(transactions, range, reporting),
+      flow: flowByMonth(transactions, range, reporting),
+      netWorth: netWorthOver(accounts, transactions, range, reporting, (currency) =>
+        this.rates.rateToReporting(currency),
+      ),
+      payees: topPayees(transactions, range, reporting, 8),
+      totals: totalsFor(transactions, range, reporting),
+      currency: reporting,
+      unconverted: unconvertedIn(transactions, range, reporting),
     };
   });
 

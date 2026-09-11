@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { addIcons } from 'ionicons';
 import {
   addOutline,
@@ -11,7 +11,10 @@ import {
   walletOutline,
 } from 'ionicons/icons';
 import { Account } from '../../core/models/domain';
+import { convert } from '../../core/money/conversion';
 import { AccountsService } from '../../core/repositories/accounts.service';
+import { RatesService } from '../../core/repositories/rates.service';
+import { formatMoney } from '../../core/util/money';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { SyncStatusComponent } from '../../shared/sync-status.component';
 import { AccountEditorComponent } from './account-editor.component';
@@ -52,6 +55,9 @@ import {
         text-align: center;
         padding: 3rem 1.5rem;
       }
+      .warning {
+        padding: 0 1rem 0.75rem;
+      }
     `,
   ],
   template: `
@@ -66,8 +72,15 @@ import {
       @if (accounts.active().length) {
         <div class="total">
           <ion-note>Net worth</ion-note>
-          <strong>{{ accounts.netWorth() | money: accounts.active()[0].currency }}</strong>
+          <strong>{{ accounts.netWorth() | money: reportingCurrency() }}</strong>
         </div>
+        @if (unconverted().length) {
+          <div class="warning">
+            <ion-note color="warning">
+              Excludes {{ unconverted().join(', ') }} — add a rate to include them
+            </ion-note>
+          </div>
+        }
 
         <ion-list>
           @for (account of accounts.active(); track account.id) {
@@ -79,6 +92,9 @@ import {
               </ion-label>
               <ion-note slot="end" [color]="balanceOf(account) < 0 ? 'danger' : undefined">
                 {{ balanceOf(account) | money: account.currency }}
+                @if (converted(account); as inReporting) {
+                  <br /><small>≈ {{ inReporting }}</small>
+                }
               </ion-note>
             </ion-item>
           }
@@ -127,7 +143,11 @@ import {
 })
 export class AccountsPage {
   readonly accounts = inject(AccountsService);
+  private readonly rates = inject(RatesService);
   private readonly alerts = inject(AlertController);
+
+  readonly reportingCurrency = computed(() => this.rates.reportingCurrency());
+  readonly unconverted = computed(() => this.accounts.netWorthDetail().unconverted);
 
   readonly editorOpen = signal(false);
   readonly editing = signal<Account | null>(null);
@@ -138,6 +158,24 @@ export class AccountsPage {
 
   balanceOf(account: Account): number {
     return this.accounts.balances().get(account.id) ?? account.openingBalance;
+  }
+
+  /**
+   * A foreign balance shown in the reporting currency too, so the list adds up
+   * to the headline. Null when the account is already in that currency, or when
+   * no rate is known — in which case the figure would be a guess.
+   */
+  converted(account: Account): string | null {
+    const reporting = this.reportingCurrency();
+    if (account.currency.toUpperCase() === reporting.toUpperCase()) return null;
+
+    const rate = this.rates.rateToReporting(account.currency);
+    if (rate === null) return null;
+
+    return formatMoney(
+      convert(this.balanceOf(account), rate, account.currency, reporting),
+      reporting,
+    );
   }
 
   create(): void {

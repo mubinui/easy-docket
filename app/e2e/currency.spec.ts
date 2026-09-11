@@ -122,6 +122,39 @@ test.describe('currencies', () => {
     await expect(modal.getByText('Worth $50.00')).toBeVisible();
   });
 
+  test('converts a foreign balance into the reporting currency', async ({ page }) => {
+    await openRates(page);
+    await addRate(page, 'EUR', 'USD', '1.1');
+    await addEuroAccount(page);
+
+    // €100 opening balance, converted at 1.1 alongside the $1,000 account.
+    await goToTab(page, 'Accounts', Screen.accounts);
+    await page.locator(Screen.accounts).getByRole('heading', { name: 'Euro account' }).click();
+    await fillField(page, 'Opening balance', '100.00');
+    await tap(page, 'Save');
+
+    const list = page.locator(Screen.accounts);
+    await expect(list.getByText('€100.00')).toBeVisible();
+    // Shown in its own currency, and again in the reporting one.
+    await expect(list.getByText('≈ $110.00')).toBeVisible();
+    await expect(list.locator('.total strong')).toHaveText('$1,110.00');
+  });
+
+  test('says what it left out rather than quietly understating a total', async ({ page }) => {
+    // A euro account with no rate: counting €100 as $100 would be wrong in a
+    // way nobody would notice.
+    await addEuroAccount(page);
+    await goToTab(page, 'Accounts', Screen.accounts);
+    await page.locator(Screen.accounts).getByRole('heading', { name: 'Euro account' }).click();
+    await fillField(page, 'Opening balance', '100.00');
+    await tap(page, 'Save');
+
+    const list = page.locator(Screen.accounts);
+    await expect(list.getByText(/Excludes EUR/)).toBeVisible();
+    // The headline is the dollar account alone, not $1,100.
+    await expect(list.locator('.total strong')).toHaveText('$1,000.00');
+  });
+
   test('keeps the rate on the transaction it was entered for', async ({ page }) => {
     await addEuroAccount(page);
 

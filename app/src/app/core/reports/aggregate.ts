@@ -1,3 +1,4 @@
+import { inReporting, sameCurrency } from '../money/conversion';
 import { Account, Minor, Transaction } from '../models/domain';
 import { DateRange, monthKey, monthsIn, within } from '../util/dates';
 
@@ -9,10 +10,17 @@ import { DateRange, monthKey, monthsIn, within } from '../util/dates';
  * being able to state and test in isolation. Charts are a presentation of these
  * results and have no business recomputing any of it.
  *
- * One rule runs through all of them: **transfers are not income or expense.**
- * Moving money between your own accounts is not earning or spending it, and a
- * report that counted transfers would make a person look wildly richer and more
- * profligate than they are.
+ * Two rules run through all of them.
+ *
+ * **Transfers are not income or expense.** Moving money between your own
+ * accounts is not earning or spending it, and a report that counted transfers
+ * would make a person look wildly richer and more profligate than they are.
+ *
+ * **A transaction that cannot be converted is skipped, not zeroed.** Every
+ * aggregation works in the reporting currency, and a transaction in another
+ * currency with no rate has no honest value here. Dropping it silently would
+ * understate a total without saying so, which is why `unconvertedIn` exists and
+ * why the screens are expected to show it.
  */
 
 export interface CategoryTotal {
@@ -49,15 +57,19 @@ export interface PayeeTotal {
 export function spendByCategory(
   transactions: readonly Transaction[],
   range: DateRange,
+  reporting: string,
 ): CategoryTotal[] {
   const totals = new Map<string | null, { amount: Minor; count: number }>();
 
   for (const transaction of transactions) {
     if (transaction.kind !== 'expense' || !within(transaction.date, range)) continue;
 
+    const amount = inReporting(transaction, reporting);
+    if (amount === null) continue;
+
     const key = transaction.categoryId;
     const entry = totals.get(key) ?? { amount: 0, count: 0 };
-    entry.amount += transaction.amount;
+    entry.amount += amount;
     entry.count += 1;
     totals.set(key, entry);
   }
@@ -86,6 +98,7 @@ export function spendByCategory(
 export function flowByMonth(
   transactions: readonly Transaction[],
   range: DateRange,
+  reporting: string,
 ): MonthlyFlow[] {
   const buckets = new Map<string, MonthlyFlow>(
     monthsIn(range).map((month) => [month, { month, income: 0, expense: 0, net: 0 }]),
@@ -96,8 +109,11 @@ export function flowByMonth(
     const bucket = buckets.get(monthKey(transaction.date));
     if (!bucket) continue;
 
-    if (transaction.kind === 'income') bucket.income += transaction.amount;
-    else if (transaction.kind === 'expense') bucket.expense += transaction.amount;
+    const amount = inReporting(transaction, reporting);
+    if (amount === null) continue;
+
+    if (transaction.kind === 'income') bucket.income += amount;
+    else if (transaction.kind === 'expense') bucket.expense += amount;
   }
 
   for (const bucket of buckets.values()) {
@@ -118,8 +134,21 @@ export function netWorthOver(
   accounts: readonly Account[],
   transactions: readonly Transaction[],
   range: DateRange,
+  reporting: string,
+  /**
+   * Rate for an account's opening balance. Unlike a transaction, an opening
+   * balance is not a dated event — it is a standing figure — so it is converted
+   * at the latest rate known rather than one from a particular day.
+   */
+  rateForCurrency: (currency: string) => number | null = () => null,
 ): NetWorthPoint[] {
-  const opening = accounts.reduce((sum, account) => sum + account.openingBalance, 0);
+  const opening = accounts.reduce((sum, account) => {
+    if (sameCurrency(account.currency, reporting)) return sum + account.openingBalance;
+
+    const rate = rateForCurrency(account.currency);
+    if (rate === null) return sum;
+    return sum + convertOpening(account.openingBalance, rate, account.currency, reporting);
+  }, 0);
 
   // One pass, in date order, rather than re-scanning the ledger per month.
   const ordered = [...transactions].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
@@ -131,7 +160,7 @@ export function netWorthOver(
   for (const month of monthsIn(range)) {
     const cutoff = lastDayOf(month, range);
     while (index < ordered.length && ordered[index].date <= cutoff) {
-      running += delta(ordered[index]);
+      running += delta(ordered[index], reporting);
       index++;
     }
     points.push({ date: cutoff, amount: running });
@@ -144,6 +173,7 @@ export function netWorthOver(
 export function topPayees(
   transactions: readonly Transaction[],
   range: DateRange,
+  reporting: string,
   limit = 10,
 ): PayeeTotal[] {
   const totals = new Map<string, PayeeTotal>();
@@ -156,8 +186,11 @@ export function topPayees(
     // "" would invent a merchant that dwarfs the real ones.
     if (!payee) continue;
 
+    const amount = inReporting(transaction, reporting);
+    if (amount === null) continue;
+
     const entry = totals.get(payee) ?? { payee, amount: 0, count: 0 };
-    entry.amount += transaction.amount;
+    entry.amount += amount;
     entry.count += 1;
     totals.set(payee, entry);
   }
@@ -171,23 +204,57 @@ export function topPayees(
 export function totalsFor(
   transactions: readonly Transaction[],
   range: DateRange,
+  reporting: string,
 ): { income: Minor; expense: Minor; net: Minor } {
   let income = 0;
   let expense = 0;
 
   for (const transaction of transactions) {
     if (!within(transaction.date, range)) continue;
-    if (transaction.kind === 'income') income += transaction.amount;
-    else if (transaction.kind === 'expense') expense += transaction.amount;
+
+    const amount = inReporting(transaction, reporting);
+    if (amount === null) continue;
+
+    if (transaction.kind === 'income') income += amount;
+    else if (transaction.kind === 'expense') expense += amount;
   }
   return { income, expense, net: income - expense };
 }
 
+/**
+ * How many transactions in a range could not be converted.
+ *
+ * The screens show this beside any total built from the same range, so a figure
+ * is never quietly short of the transactions it could not account for.
+ */
+export function unconvertedIn(
+  transactions: readonly Transaction[],
+  range: DateRange,
+  reporting: string,
+): number {
+  let count = 0;
+  for (const transaction of transactions) {
+    if (!within(transaction.date, range)) continue;
+    if (transaction.kind === 'transfer') continue;
+    if (inReporting(transaction, reporting) === null) count++;
+  }
+  return count;
+}
+
 /** Effect of one transaction on total net worth. Transfers net to zero. */
-function delta(transaction: Transaction): Minor {
-  if (transaction.kind === 'income') return transaction.amount;
-  if (transaction.kind === 'expense') return -transaction.amount;
-  return 0;
+function delta(transaction: Transaction, reporting: string): Minor {
+  if (transaction.kind === 'transfer') return 0;
+
+  const amount = inReporting(transaction, reporting);
+  if (amount === null) return 0;
+
+  return transaction.kind === 'income' ? amount : -amount;
+}
+
+/** An opening balance converted at the latest known rate. */
+function convertOpening(amount: Minor, rate: number, from: string, to: string): Minor {
+  // Reuses the same rounding and minor-unit handling as every other conversion.
+  return inReporting({ amount, currency: from, rate }, to) ?? 0;
 }
 
 /** The last day of a month, clamped to the range so the final point is honest. */

@@ -7,6 +7,7 @@ import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { Budget } from '../models/domain';
 import { LedgerService } from './ledger.service';
+import { RatesService } from './rates.service';
 import { toIsoDate } from '../util/dates';
 
 /** What a caller must supply to create a budget; the rest defaults. */
@@ -29,6 +30,7 @@ export interface BudgetStatus {
 export class BudgetsService {
   private readonly db: DocketDb = inject(DOCKET_DB);
   private readonly ledger = inject(LedgerService);
+  private readonly rates = inject(RatesService);
 
   /**
    * Sorted in memory rather than by index. A ledger has tens of budgets, not

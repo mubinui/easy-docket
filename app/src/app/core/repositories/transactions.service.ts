@@ -5,8 +5,10 @@ import { from } from 'rxjs';
 import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { Transaction } from '../models/domain';
+import { inReporting } from '../money/conversion';
 import { DateRange, currentMonth } from '../util/dates';
 import { LedgerService } from './ledger.service';
+import { RatesService } from './rates.service';
 
 /**
  * What a caller must supply to record a transaction. Everything else — note,
@@ -30,6 +32,7 @@ export interface TransactionFilter {
 export class TransactionsService {
   private readonly db: DocketDb = inject(DOCKET_DB);
   private readonly ledger = inject(LedgerService);
+  private readonly rates = inject(RatesService);
 
   /** The window the transactions screen is looking at; drives the live query. */
   readonly filter = signal<TransactionFilter>({
@@ -73,15 +76,31 @@ export class TransactionsService {
     { initialValue: [] as Transaction[] },
   );
 
-  /** Income and expense totals over the visible set; transfers are excluded. */
+  /**
+   * Income and expense totals over the visible set, in the reporting currency.
+   *
+   * Transfers are excluded, and anything with no rate is counted rather than
+   * added at face value: a month's total that treated €45 as $45 would be
+   * wrong in a way nobody would notice.
+   */
   readonly totals = computed(() => {
+    const reporting = this.rates.reportingCurrency();
     let income = 0;
     let expense = 0;
+    let unconverted = 0;
+
     for (const txn of this.visible()) {
-      if (txn.kind === 'income') income += txn.amount;
-      else if (txn.kind === 'expense') expense += txn.amount;
+      if (txn.kind === 'transfer') continue;
+
+      const amount = inReporting(txn, reporting);
+      if (amount === null) {
+        unconverted++;
+        continue;
+      }
+      if (txn.kind === 'income') income += amount;
+      else expense += amount;
     }
-    return { income, expense, net: income - expense };
+    return { income, expense, net: income - expense, unconverted, currency: reporting };
   });
 
   /** Visible transactions grouped by day, for a sectioned list. */
@@ -95,13 +114,19 @@ export class TransactionsService {
     return [...groups.entries()].map(([date, items]) => ({ date, items }));
   });
 
-  /** Spend per category over the visible set, largest first. */
+  /** Spend per category over the visible set, largest first, in the reporting currency. */
   readonly spendByCategory = computed(() => {
+    const reporting = this.rates.reportingCurrency();
     const totals = new Map<string, number>();
+
     for (const txn of this.visible()) {
       if (txn.kind !== 'expense') continue;
+
+      const amount = inReporting(txn, reporting);
+      if (amount === null) continue;
+
       const key = txn.categoryId ?? 'uncategorised';
-      totals.set(key, (totals.get(key) ?? 0) + txn.amount);
+      totals.set(key, (totals.get(key) ?? 0) + amount);
     }
     return [...totals.entries()]
       .map(([categoryId, amount]) => ({ categoryId, amount }))

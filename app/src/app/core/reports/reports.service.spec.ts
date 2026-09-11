@@ -87,12 +87,24 @@ describe('ReportsService', () => {
     expect(data.currency).toBe('USD');
   });
 
-  it('follows the ledger currency', async () => {
+  it('reports in the vault reporting currency, not an account currency', async () => {
+    // Accounts in several currencies have to share one scale, and the reporting
+    // currency is the one rates are quoted against.
     await db.accounts.clear();
     await db.accounts.put(anAccount({ currency: 'JPY' }));
-    await settle(() => reports.data().currency === 'JPY');
+    await settle(() => reports.data().currency === 'USD');
 
-    expect(reports.data().currency).toBe('JPY');
+    expect(reports.data().currency).toBe('USD');
+  });
+
+  it('counts transactions it could not convert', async () => {
+    await db.transactions.put(
+      aTransaction({ id: 't-eur', date: today, amount: 4_500, currency: 'EUR' }),
+    );
+    await settle(() => reports.hasHistory());
+
+    expect(reports.data().unconverted).toBe(1);
+    expect(reports.data().totals.expense).toBe(0);
   });
 
   it('re-aggregates when the range changes', async () => {
