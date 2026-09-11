@@ -11,7 +11,13 @@ import { LedgerService } from '../repositories/ledger.service';
 import { SyncSettingsService } from './sync-settings.service';
 import { fakeVault } from '../testing/fake-vault';
 import { InMemoryAdapter } from '../testing/in-memory-adapter';
-import { aBudget, aRecurringRule, aTransaction, anAccount } from '../testing/factories';
+import {
+  aBudget,
+  aRecurringRule,
+  aTransaction,
+  anAccount,
+  anExchangeRate,
+} from '../testing/factories';
 import { SyncTransportError } from './sync-adapter';
 import { SyncService } from './sync.service';
 
@@ -314,6 +320,19 @@ describe('SyncService', () => {
       expect(dump).not.toContain('Therapy');
       expect(dump).not.toContain('Dr Okonkwo');
       expect(dump).not.toContain('recurringRules');
+    });
+  });
+
+  describe('exchange rates', () => {
+    it('replicates, so a rate entered on a phone is there on a laptop', async () => {
+      const bob = await makeDevice('bbbbbbbb', key, remote);
+
+      await alice.ledger.put('rates', anExchangeRate());
+      await alice.sync.sync(alice.adapter);
+      await bob.sync.sync(bob.adapter);
+
+      expect((await bob.db.rates.get('EUR:USD:2026-03-14'))?.rate).toBe(1.1);
+      expect(alice.adapter.dump()).not.toContain('rates');
     });
   });
 

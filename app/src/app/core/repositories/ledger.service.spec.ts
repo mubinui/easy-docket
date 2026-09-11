@@ -4,7 +4,13 @@ import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { Operation } from '../models/oplog';
 import { encodeHlc } from '../util/hlc';
-import { aBudget, aRecurringRule, anAccount, aTransaction } from '../testing/factories';
+import {
+  aBudget,
+  aRecurringRule,
+  anAccount,
+  anExchangeRate,
+  aTransaction,
+} from '../testing/factories';
 import { LedgerService } from './ledger.service';
 
 /**
@@ -218,6 +224,27 @@ describe('LedgerService', () => {
 
       expect(await db.recurringRules.get('rule-1')).toBeUndefined();
       expect((await ledger.allOperations()).map((o) => o.op)).toEqual(['put', 'delete']);
+    });
+  });
+
+  describe('exchange rates', () => {
+    it('records and merges a rate with no new code path', async () => {
+      await ledger.put('rates', anExchangeRate());
+      expect(await db.rates.get('EUR:USD:2026-03-14')).toBeDefined();
+
+      const applied = await ledger.merge([
+        {
+          hlc: stampAt(-1_000),
+          entity: 'rates',
+          entityId: 'GBP:USD:2026-03-14',
+          op: 'put',
+          value: anExchangeRate({ id: 'GBP:USD:2026-03-14', base: 'GBP', rate: 1.27 }),
+          device: 'bbbbbbbb',
+        },
+      ]);
+
+      expect(applied).toBe(1);
+      expect((await db.rates.get('GBP:USD:2026-03-14'))?.rate).toBe(1.27);
     });
   });
 

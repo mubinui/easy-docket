@@ -59,6 +59,42 @@ export interface Transaction {
   note: string;
   tags: string[];
   cleared: boolean;
+
+  /**
+   * Units of the reporting currency one unit of `currency` bought, at the
+   * moment this happened. Absent when the transaction is already in the
+   * reporting currency, or when it predates multi-currency support.
+   *
+   * Stored rather than derived so that last year's totals never move. A report
+   * that reads differently on two afternoons because a rate drifted is a report
+   * nobody can trust, and a ledger that rewrites its own history is unsettling.
+   */
+  rate?: number;
+  /** The date the stored rate was quoted for, `YYYY-MM-DD`. */
+  rateDate?: string;
+
+  createdAt: number;
+  updatedAt: string;
+}
+
+/**
+ * A quoted exchange rate: how many units of `quote` one unit of `base` buys on
+ * a given day.
+ *
+ * Rates are vault data and replicate like everything else, so a rate entered on
+ * a phone is available on a laptop. They are kept per day rather than as a
+ * single current figure, because a transaction recorded last March needs
+ * March's rate, not today's.
+ */
+export interface ExchangeRate {
+  /** `<base>:<quote>:<date>`, so the same quote cannot be stored twice. */
+  id: string;
+  base: string;
+  quote: string;
+  /** Units of `quote` per one unit of `base`. Always positive. */
+  rate: number;
+  date: string;
+  source: 'manual' | 'fetched';
   createdAt: number;
   updatedAt: string;
 }
@@ -156,6 +192,7 @@ export const ENTITY_NAMES = [
   'transactions',
   'budgets',
   'recurringRules',
+  'rates',
 ] as const;
 
 export type EntityName = (typeof ENTITY_NAMES)[number];
@@ -166,6 +203,7 @@ export interface EntityMap {
   transactions: Transaction;
   budgets: Budget;
   recurringRules: RecurringRule;
+  rates: ExchangeRate;
 }
 
 export type AnyEntity = EntityMap[EntityName];

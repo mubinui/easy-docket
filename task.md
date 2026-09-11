@@ -27,10 +27,10 @@ Every task follows the same loop, and none of it is optional:
 | 2 | Budgets | ✅ Done |
 | 3 | Reports | ✅ Done |
 | 4 | Recurring transactions | ✅ Done |
-| 5 | Multi-currency | ⬜ Next |
+| 5 | Multi-currency | 🔄 In progress — 5.1 done |
 | 6 | Release readiness | 🔄 6.5 done |
 
-Tests today: **408 client unit**, **42 end-to-end**, **84 Go**.
+Tests today: **435 client unit**, **42 end-to-end**, **84 Go**.
 
 ---
 
@@ -449,24 +449,58 @@ screen reader. It now reports its state in words: "Synced — tap to sync now",
 
 ---
 
-## Phase 5 — Multi-currency ⬅ next
+## Phase 5 — Multi-currency 🔄
 
 Goal: accounts in different currencies that still roll into one net worth.
 
-- [ ] Rate table (`meta` or its own entity) with manual entry and an optional fetch
-- [ ] A reporting currency setting
-- [ ] Conversion in balances, net worth, budgets and reports
-- [ ] Currency shown wherever a converted figure is displayed
+### 5.1 Rate model and conversion ✅
 
-**Tests** — conversion rounding at the minor unit; a missing rate degrading
-visibly rather than silently showing a wrong total; zero-decimal currencies
-(JPY) against three-decimal ones (KWD).
+- [x] `ExchangeRate` entity and Dexie `version(4)`, keyed `<base>:<quote>:<date>`
+- [x] `Transaction.rate` / `rateDate` — optional, so no migration is needed and
+      rows written before multi-currency simply do not carry them
+- [x] `core/money/conversion.ts` — `convert`, `inReporting`, `rateFor`,
+      `invertRate`, `sumInReporting`, all pure
 
-**Open question for you when we get there:** should a transaction store the
-rate at the time it happened (historically accurate, more storage) or convert at
-display time (simpler, but last year's totals shift when rates move)? My
-recommendation is to store the rate on the transaction — a ledger that changes
+**Decided: the rate is stored on the transaction.** Last year's totals then
+never move. Converting at display time would mean a report that reads
+differently on two afternoons because a rate drifted, and a ledger that rewrites
 its own history is unsettling.
+
+**A missing rate is not zero.** `inReporting` returns null rather than guessing,
+and `sumInReporting` counts what it could not convert. A total that silently
+omits the transactions it could not handle is worse than one that says it is
+incomplete — the UI in 5.3 has to surface that count.
+
+**Rates carry forward, never backward.** `rateFor` uses the quote for the day or
+the most recent one before it, because markets close at weekends and a Saturday
+purchase converts at Friday's rate. A later quote is never used: that would be
+hindsight.
+
+**Tests** (27 added, 408 → 435)
+- [x] Conversion across different minor units — USD to JPY (no minor unit) and
+      KWD (three places) in both directions
+- [x] Rounding away from zero at a half, so an expense on a half is never
+      quietly shrunk
+- [x] Rates replicate like every other entity, with no new code in the engine
+
+**What it found.** The half-rounding test failed for a real reason: binary
+floating point cannot hold 1.005, so `100 × 1.005` evaluates to
+100.49999999999999 and an exact half rounded the wrong way. Conversion now snaps
+to nine decimal places before rounding — far below any precision a currency has,
+and enough to restore the decimal value a person would have computed.
+
+Schema assertions now compare against an exported `SCHEMA_VERSION` rather than a
+literal, so a version bump stops breaking three unrelated tests.
+
+### 5.2 Rate management and reporting currency
+- [ ] A reporting-currency setting
+- [ ] Enter, edit and delete rates; invert a quote rather than typing both
+- [ ] Prompt for a rate when recording a transaction in another currency
+
+### 5.3 Conversion applied
+- [ ] Balances, net worth, budgets and reports converted
+- [ ] Unconverted transactions surfaced, never silently dropped
+- [ ] The currency shown wherever a converted figure is displayed
 
 ---
 

@@ -1,5 +1,12 @@
 import Dexie, { Table } from 'dexie';
-import { Account, Budget, Category, RecurringRule, Transaction } from '../models/domain';
+import {
+  Account,
+  Budget,
+  Category,
+  ExchangeRate,
+  RecurringRule,
+  Transaction,
+} from '../models/domain';
 import { LocalOperation } from '../models/oplog';
 
 /**
@@ -31,12 +38,22 @@ export interface MetaRecord {
   value: unknown;
 }
 
+/**
+ * The schema version this build declares.
+ *
+ * Exported so tests can assert "upgrades to the current version" rather than a
+ * literal that has to be edited on every bump — a test that needs changing
+ * whenever the schema grows stops being a check and becomes a chore.
+ */
+export const SCHEMA_VERSION = 4;
+
 export class DocketDb extends Dexie {
   accounts!: Table<Account, string>;
   categories!: Table<Category, string>;
   transactions!: Table<Transaction, string>;
   budgets!: Table<Budget, string>;
   recurringRules!: Table<RecurringRule, string>;
+  rates!: Table<ExchangeRate, string>;
   oplog!: Table<LocalOperation, string>;
   remoteObjects!: Table<RemoteObjectRecord, string>;
   meta!: Table<MetaRecord, string>;
@@ -75,6 +92,16 @@ export class DocketDb extends Dexie {
     // keep correct across two devices that both ran the materialiser.
     this.version(3).stores({
       recurringRules: 'id, startDate, archived',
+    });
+
+    // v4 — exchange rates.
+    //
+    // The compound [base+quote+date] index serves the only question asked of
+    // this table: what was this pair worth on, or before, a given day. No
+    // migration: `Transaction.rate` and `rateDate` are optional, and rows
+    // written before multi-currency simply do not carry them.
+    this.version(4).stores({
+      rates: 'id, date, [base+quote+date]',
     });
   }
 }

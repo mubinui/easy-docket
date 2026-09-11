@@ -1,4 +1,11 @@
-import { Account, Budget, Category, RecurringRule, Transaction } from '../models/domain';
+import {
+  Account,
+  Budget,
+  Category,
+  ExchangeRate,
+  RecurringRule,
+  Transaction,
+} from '../models/domain';
 
 /**
  * Builders for test fixtures. Every field has a sensible default so a test only
@@ -92,6 +99,20 @@ export function aRecurringRule(overrides: Partial<RecurringRule> = {}): Recurrin
     maxOccurrences: null,
     skipped: [],
     archived: false,
+    createdAt: 1_700_000_000_000,
+    updatedAt: '',
+    ...overrides,
+  };
+}
+
+export function anExchangeRate(overrides: Partial<ExchangeRate> = {}): ExchangeRate {
+  return {
+    id: 'EUR:USD:2026-03-14',
+    base: 'EUR',
+    quote: 'USD',
+    rate: 1.1,
+    date: '2026-03-14',
+    source: 'manual',
     createdAt: 1_700_000_000_000,
     updatedAt: '',
     ...overrides,

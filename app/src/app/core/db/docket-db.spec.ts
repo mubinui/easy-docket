@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import { describe, expect, it } from 'vitest';
-import { DocketDb } from './docket-db';
+import { DocketDb, SCHEMA_VERSION } from './docket-db';
 import { aBudget, anAccount, aTransaction } from '../testing/factories';
 
 /**
@@ -51,7 +51,7 @@ describe('DocketDb schema', () => {
     const db = new DocketDb(name);
     await db.open();
 
-    expect(db.verno).toBe(3);
+    expect(db.verno).toBe(SCHEMA_VERSION);
     expect(await db.accounts.get('acc-1')).toMatchObject({
       name: 'Everyday',
       updatedAt: 'stamp-a',
@@ -84,6 +84,7 @@ describe('DocketDb schema', () => {
       'categories',
       'meta',
       'oplog',
+      'rates',
       'recurringRules',
       'remoteObjects',
       'transactions',
@@ -91,7 +92,7 @@ describe('DocketDb schema', () => {
     db.close();
   });
 
-  it('upgrades a v2 database to v3, budgets intact', async () => {
+  it('upgrades a v2 database to the current version, budgets intact', async () => {
     const name = `migration-${counter++}`;
     await seedV1Database(name);
 
@@ -106,7 +107,7 @@ describe('DocketDb schema', () => {
     const db = new DocketDb(name);
     await db.open();
 
-    expect(db.verno).toBe(3);
+    expect(db.verno).toBe(SCHEMA_VERSION);
     expect((await db.budgets.get('bud-1'))?.name).toBe('Groceries cap');
     expect(await db.accounts.get('acc-1')).toBeDefined();
     expect(await db.recurringRules.count()).toBe(0);
