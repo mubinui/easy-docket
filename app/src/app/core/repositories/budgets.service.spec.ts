@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { aBudget, aCategory, aTransaction } from '../testing/factories';
+import { waitForItems, waitUntil } from '../testing/async';
 import { BudgetsService } from './budgets.service';
 import { LedgerService } from './ledger.service';
 import { toIsoDate } from '../util/dates';
@@ -155,7 +156,7 @@ describe('BudgetsService', () => {
       await db.transactions.put(aTransaction({ date: today, amount: 12_500, categoryId: 'cat-1' }));
 
       // liveQuery is asynchronous; give the signal a turn to settle.
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitForItems(budgets.statuses);
 
       const [status] = budgets.statuses();
       expect(status?.progress).toMatchObject({ spent: 12_500, remaining: 37_500 });
@@ -164,7 +165,7 @@ describe('BudgetsService', () => {
 
     it('surfaces a budget whose category was deleted', async () => {
       await budgets.save(aBudget({ startDate: thisMonth, categoryIds: ['cat-gone'] }));
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitForItems(budgets.needingAttention);
 
       expect(budgets.needingAttention()).toHaveLength(1);
       expect(budgets.needingAttention()[0].staleCategoryIds).toEqual(['cat-gone']);
@@ -173,14 +174,14 @@ describe('BudgetsService', () => {
     it('lists budgets by name, without needing an index on it', async () => {
       await budgets.save(aBudget({ id: 'bud-z', name: 'Zoo trips' }));
       await budgets.save(aBudget({ id: 'bud-a', name: 'Apples' }));
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitUntil(() => budgets.all().length === 2);
 
       expect(budgets.all().map((b) => b.name)).toEqual(['Apples', 'Zoo trips']);
     });
 
     it('excludes archived budgets', async () => {
       await budgets.save(aBudget({ startDate: thisMonth, archived: true }));
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitUntil(() => budgets.all().length > 0);
 
       expect(budgets.statuses()).toHaveLength(0);
     });
@@ -191,7 +192,7 @@ describe('BudgetsService', () => {
       await budgets.save(aBudget({ id: 'bud-b', name: 'B', startDate: thisMonth, amount: 10_000 }));
       await db.transactions.put(aTransaction({ date: today, amount: 9_000, categoryId: 'cat-1' }));
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitUntil(() => budgets.byUrgency().length === 2);
 
       // Both see the same 90.00 of spend; the smaller budget is nearer its limit.
       expect(budgets.byUrgency().map((s) => s.budget.id)).toEqual(['bud-b', 'bud-a']);

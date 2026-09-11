@@ -94,6 +94,54 @@ export interface Budget {
   updatedAt: string;
 }
 
+export type RecurrenceUnit = 'day' | 'week' | 'month' | 'year';
+
+/**
+ * A standing instruction: rent on the 1st, salary on the 25th, a subscription
+ * every year.
+ *
+ * The rule is not itself a transaction and never appears in a balance. It is a
+ * template plus a schedule, from which ordinary transactions are materialised —
+ * so history stays a flat log of things that actually happened, and editing a
+ * rule tomorrow cannot silently rewrite what it produced last year.
+ */
+export interface RecurringRule {
+  id: string;
+  name: string;
+
+  /** The transaction this rule creates, minus its date. */
+  kind: TransactionKind;
+  amount: Minor;
+  currency: string;
+  accountId: string;
+  counterAccountId: string | null;
+  categoryId: string | null;
+  payee: string;
+  note: string;
+  tags: string[];
+
+  /** Every `interval` `unit`s: 1 month, 2 weeks, 3 days. */
+  interval: number;
+  unit: RecurrenceUnit;
+  /** The first occurrence, `YYYY-MM-DD`. Later ones are measured from here. */
+  startDate: string;
+  /** Last date the rule may produce anything, or null for open-ended. */
+  endDate: string | null;
+  /** Cap on how many occurrences are ever created, or null for unlimited. */
+  maxOccurrences: number | null;
+
+  /**
+   * Occurrence dates the user has explicitly skipped — a month the rent was
+   * not due, a subscription paused. Kept on the rule rather than as tombstones
+   * so a skip replicates like any other edit.
+   */
+  skipped: string[];
+
+  archived: boolean;
+  createdAt: number;
+  updatedAt: string;
+}
+
 /**
  * Every entity the ledger stores and replicates.
  *
@@ -102,7 +150,13 @@ export interface Budget {
  * — the merge transaction's scope, most obviously — iterates this, so adding an
  * entity cannot leave a code path quietly behind.
  */
-export const ENTITY_NAMES = ['accounts', 'categories', 'transactions', 'budgets'] as const;
+export const ENTITY_NAMES = [
+  'accounts',
+  'categories',
+  'transactions',
+  'budgets',
+  'recurringRules',
+] as const;
 
 export type EntityName = (typeof ENTITY_NAMES)[number];
 
@@ -111,6 +165,7 @@ export interface EntityMap {
   categories: Category;
   transactions: Transaction;
   budgets: Budget;
+  recurringRules: RecurringRule;
 }
 
 export type AnyEntity = EntityMap[EntityName];

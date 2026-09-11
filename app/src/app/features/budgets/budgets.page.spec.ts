@@ -7,6 +7,7 @@ import { BudgetsService } from '../../core/repositories/budgets.service';
 import { LedgerService } from '../../core/repositories/ledger.service';
 import { toIsoDate } from '../../core/util/dates';
 import { aBudget, aCategory, aTransaction } from '../../core/testing/factories';
+import { waitUntil } from '../../core/testing/async';
 import { BudgetsPage } from './budgets.page';
 
 let counter = 0;
@@ -15,15 +16,21 @@ let counter = 0;
 const today = toIsoDate();
 const monthStart = `${today.slice(0, 8)}01`;
 
-/** liveQuery is asynchronous; let the signals settle before asserting. */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 60));
+/**
+ * liveQuery is asynchronous. Polling a condition rather than sleeping a fixed
+ * span keeps these tests from passing on an idle machine and failing on a busy
+ * one — see `core/testing/async.ts`.
+ */
+/** Wait for a condition rather than a fixed span; see `core/testing/async.ts`. */
+const settle = waitUntil;
 
 describe('BudgetsPage', () => {
   let fixture: ComponentFixture<BudgetsPage>;
   let page: BudgetsPage;
   let db: DocketDb;
 
-  async function render(): Promise<void> {
+  /** `expected` is how many budgets were seeded, so the wait has something real to watch. */
+  async function render(expected = 0): Promise<void> {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [BudgetsPage],
@@ -34,7 +41,8 @@ describe('BudgetsPage', () => {
     fixture = TestBed.createComponent(BudgetsPage);
     page = fixture.componentInstance;
     fixture.detectChanges();
-    await settle();
+
+    await settle(() => page.budgets.all().length >= expected);
     fixture.detectChanges();
   }
 
@@ -53,7 +61,7 @@ describe('BudgetsPage', () => {
   it('lists a budget with its progress', async () => {
     await db.budgets.put(aBudget({ name: 'Groceries', amount: 50_000, startDate: monthStart }));
     await db.transactions.put(aTransaction({ date: today, amount: 12_500, categoryId: 'cat-1' }));
-    await render();
+    await render(1);
 
     expect(page.statuses()).toHaveLength(1);
     const text = fixture.nativeElement.textContent;
@@ -67,7 +75,7 @@ describe('BudgetsPage', () => {
       aBudget({ id: 'bud-b', name: 'Tight', amount: 10_000, startDate: monthStart }),
     ]);
     await db.transactions.put(aTransaction({ date: today, amount: 9_000, categoryId: 'cat-1' }));
-    await render();
+    await render(2);
 
     expect(page.statuses().map((s) => s.budget.id)).toEqual(['bud-b', 'bud-a']);
   });
@@ -75,7 +83,7 @@ describe('BudgetsPage', () => {
   it('marks an overspent budget in the danger colour', async () => {
     await db.budgets.put(aBudget({ amount: 10_000, startDate: monthStart }));
     await db.transactions.put(aTransaction({ date: today, amount: 15_000, categoryId: 'cat-1' }));
-    await render();
+    await render(1);
 
     const [status] = page.statuses();
     expect(status.progress?.over).toBe(true);
@@ -92,7 +100,7 @@ describe('BudgetsPage', () => {
       aBudget({ id: 'bud-a', name: 'Active', startDate: monthStart }),
       aBudget({ id: 'bud-b', name: 'Retired', startDate: monthStart, archived: true }),
     ]);
-    await render();
+    await render(2);
 
     expect(page.statuses().map((s) => s.budget.name)).toEqual(['Active']);
     expect(page.archived().map((b) => b.name)).toEqual(['Retired']);
@@ -103,7 +111,7 @@ describe('BudgetsPage', () => {
       await db.budgets.put(
         aBudget({ categoryIds: ['cat-1', 'cat-gone'], startDate: monthStart }),
       );
-      await render();
+      await render(1);
 
       expect(page.statuses()[0].staleCategoryIds).toEqual(['cat-gone']);
       expect(fixture.nativeElement.textContent).toContain('missing spending');
@@ -113,11 +121,10 @@ describe('BudgetsPage', () => {
       await db.budgets.put(
         aBudget({ categoryIds: ['cat-1', 'cat-gone'], startDate: monthStart }),
       );
-      await render();
+      await render(1);
 
       const event = new MouseEvent('click');
       await page.fix(page.statuses()[0], event);
-      await settle();
 
       expect((await db.budgets.get('bud-1'))?.categoryIds).toEqual(['cat-1']);
       // The warning sits inside a tappable row; repairing must not also
@@ -127,10 +134,9 @@ describe('BudgetsPage', () => {
 
     it('explains rather than emptying a budget with nothing left to track', async () => {
       await db.budgets.put(aBudget({ categoryIds: ['cat-gone'], startDate: monthStart }));
-      await render();
+      await render(1);
 
       await page.fix(page.statuses()[0], new MouseEvent('click'));
-      await settle();
 
       // Left untouched: the user decides whether to edit or delete it.
       expect((await db.budgets.get('bud-1'))?.categoryIds).toEqual(['cat-gone']);
@@ -148,7 +154,7 @@ describe('BudgetsPage', () => {
 
     it('opens with the chosen budget loaded', async () => {
       await db.budgets.put(aBudget({ startDate: monthStart }));
-      await render();
+      await render(1);
       page.edit(page.statuses()[0].budget);
 
       expect(page.editing()?.id).toBe('bud-1');
@@ -156,10 +162,9 @@ describe('BudgetsPage', () => {
 
     it('archives from the editor', async () => {
       await db.budgets.put(aBudget({ startDate: monthStart }));
-      await render();
+      await render(1);
 
       await page.toggleArchive(page.statuses()[0].budget);
-      await settle();
 
       expect((await db.budgets.get('bud-1'))?.archived).toBe(true);
       expect(page.editorOpen()).toBe(false);

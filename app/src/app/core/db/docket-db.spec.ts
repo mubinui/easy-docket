@@ -1,7 +1,7 @@
 import Dexie from 'dexie';
 import { describe, expect, it } from 'vitest';
 import { DocketDb } from './docket-db';
-import { anAccount, aTransaction } from '../testing/factories';
+import { aBudget, anAccount, aTransaction } from '../testing/factories';
 
 /**
  * Schema migration tests.
@@ -44,14 +44,14 @@ async function seedV1Database(name: string): Promise<void> {
 }
 
 describe('DocketDb schema', () => {
-  it('upgrades a v1 database to v2 without disturbing existing rows', async () => {
+  it('upgrades a v1 database to the current version without disturbing existing rows', async () => {
     const name = `migration-${counter++}`;
     await seedV1Database(name);
 
     const db = new DocketDb(name);
     await db.open();
 
-    expect(db.verno).toBe(2);
+    expect(db.verno).toBe(3);
     expect(await db.accounts.get('acc-1')).toMatchObject({
       name: 'Everyday',
       updatedAt: 'stamp-a',
@@ -84,9 +84,43 @@ describe('DocketDb schema', () => {
       'categories',
       'meta',
       'oplog',
+      'recurringRules',
       'remoteObjects',
       'transactions',
     ]);
+    db.close();
+  });
+
+  it('upgrades a v2 database to v3, budgets intact', async () => {
+    const name = `migration-${counter++}`;
+    await seedV1Database(name);
+
+    // Open at v2 and write a budget, as a device on the previous release would.
+    const v2 = new Dexie(name);
+    v2.version(1).stores(V1_STORES);
+    v2.version(2).stores({ budgets: 'id, period, archived' });
+    await v2.open();
+    await v2.table('budgets').put(aBudget({ name: 'Groceries cap' }));
+    v2.close();
+
+    const db = new DocketDb(name);
+    await db.open();
+
+    expect(db.verno).toBe(3);
+    expect((await db.budgets.get('bud-1'))?.name).toBe('Groceries cap');
+    expect(await db.accounts.get('acc-1')).toBeDefined();
+    expect(await db.recurringRules.count()).toBe(0);
+
+    db.close();
+  });
+
+  it('indexes recurring rules for the queries the rule screens will make', async () => {
+    const db = new DocketDb(`indexes-${counter++}`);
+    await db.open();
+
+    const indexes = db.recurringRules.schema.indexes.map((i) => i.keyPath);
+    expect(indexes).toContain('startDate');
+    expect(indexes).toContain('archived');
     db.close();
   });
 

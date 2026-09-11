@@ -5,10 +5,12 @@ import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { aCategory, aTransaction, anAccount } from '../testing/factories';
 import { toIsoDate } from '../util/dates';
+import { waitUntil } from '../testing/async';
 import { ReportsService, rangeFor } from './reports.service';
 
 let counter = 0;
-const settle = () => new Promise((resolve) => setTimeout(resolve, 60));
+/** Wait for a condition rather than a fixed span; see `core/testing/async.ts`. */
+const settle = waitUntil;
 
 async function makeService(): Promise<{ reports: ReportsService; db: DocketDb }> {
   const db = new DocketDb(`reports-${counter++}`);
@@ -66,7 +68,8 @@ describe('ReportsService', () => {
   });
 
   it('reports nothing to say on an empty ledger', async () => {
-    await settle();
+    // Nothing to wait for; the point is that it stays empty.
+    await settle(() => reports.data().currency === 'USD');
     expect(reports.hasHistory()).toBe(false);
   });
 
@@ -75,7 +78,7 @@ describe('ReportsService', () => {
       aTransaction({ id: 't1', date: today, amount: 25_000, categoryId: 'cat-1' }),
       aTransaction({ id: 't2', date: today, kind: 'income', amount: 90_000, categoryId: null }),
     ]);
-    await settle();
+    await settle(() => reports.hasHistory());
 
     const data = reports.data();
     expect(reports.hasHistory()).toBe(true);
@@ -87,7 +90,7 @@ describe('ReportsService', () => {
   it('follows the ledger currency', async () => {
     await db.accounts.clear();
     await db.accounts.put(anAccount({ currency: 'JPY' }));
-    await settle();
+    await settle(() => reports.data().currency === 'JPY');
 
     expect(reports.data().currency).toBe('JPY');
   });
@@ -101,7 +104,7 @@ describe('ReportsService', () => {
     await db.transactions.put(
       aTransaction({ id: 't1', date: toIsoDate(twoMonthsAgo), amount: 5_000, categoryId: 'cat-1' }),
     );
-    await settle();
+    await settle(() => reports.hasHistory());
 
     expect(reports.data().totals.expense).toBe(0);
 
@@ -112,7 +115,7 @@ describe('ReportsService', () => {
 
   it('names categories, including ones that were deleted', async () => {
     expect(reports.nameFor(null)).toBe('Uncategorised');
-    await settle();
+    await settle(() => reports.categoryNames().size > 0);
     expect(reports.nameFor('cat-1')).toBe('Groceries');
     // A budget or a transaction can outlive the category it points at.
     expect(reports.nameFor('cat-gone')).toBe('Deleted category');
@@ -127,7 +130,7 @@ describe('ReportsService', () => {
     await db.transactions.put(
       aTransaction({ id: 't1', date: longAgo, kind: 'income', amount: 50_000 }),
     );
-    await settle();
+    await settle(() => reports.hasHistory());
 
     // Opening 1,000.00 plus 500.00 earned in 2020, even though the range is
     // this month: net worth is cumulative.

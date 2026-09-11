@@ -1,4 +1,4 @@
-import { Account, Budget, Category, Transaction } from '../models/domain';
+import { Account, Budget, Category, RecurringRule, Transaction } from '../models/domain';
 
 /**
  * Builders for test fixtures. Every field has a sensible default so a test only
@@ -65,6 +65,32 @@ export function aBudget(overrides: Partial<Budget> = {}): Budget {
     currency: 'USD',
     startDate: '2026-01-01',
     rollover: false,
+    archived: false,
+    createdAt: 1_700_000_000_000,
+    updatedAt: '',
+    ...overrides,
+  };
+}
+
+export function aRecurringRule(overrides: Partial<RecurringRule> = {}): RecurringRule {
+  return {
+    id: 'rule-1',
+    name: 'Rent',
+    kind: 'expense',
+    amount: 120_000,
+    currency: 'USD',
+    accountId: 'acc-1',
+    counterAccountId: null,
+    categoryId: 'cat-1',
+    payee: 'Landlord',
+    note: '',
+    tags: [],
+    interval: 1,
+    unit: 'month',
+    startDate: '2026-01-01',
+    endDate: null,
+    maxOccurrences: null,
+    skipped: [],
     archived: false,
     createdAt: 1_700_000_000_000,
     updatedAt: '',

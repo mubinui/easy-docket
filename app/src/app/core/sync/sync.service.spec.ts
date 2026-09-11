@@ -11,7 +11,7 @@ import { LedgerService } from '../repositories/ledger.service';
 import { SyncSettingsService } from './sync-settings.service';
 import { fakeVault } from '../testing/fake-vault';
 import { InMemoryAdapter } from '../testing/in-memory-adapter';
-import { aBudget, aTransaction, anAccount } from '../testing/factories';
+import { aBudget, aRecurringRule, aTransaction, anAccount } from '../testing/factories';
 import { SyncTransportError } from './sync-adapter';
 import { SyncService } from './sync.service';
 
@@ -294,6 +294,26 @@ describe('SyncService', () => {
       await bob.sync.sync(bob.adapter);
 
       expect(await bob.db.budgets.count()).toBe(0);
+    });
+  });
+
+  describe('recurring rules', () => {
+    it('replicates a rule, encrypted like everything else', async () => {
+      const bob = await makeDevice('bbbbbbbb', key, remote);
+
+      await alice.ledger.put(
+        'recurringRules',
+        aRecurringRule({ name: 'Therapy', payee: 'Dr Okonkwo' }),
+      );
+      await alice.sync.sync(alice.adapter);
+      await bob.sync.sync(bob.adapter);
+
+      expect((await bob.db.recurringRules.get('rule-1'))?.name).toBe('Therapy');
+
+      const dump = alice.adapter.dump();
+      expect(dump).not.toContain('Therapy');
+      expect(dump).not.toContain('Dr Okonkwo');
+      expect(dump).not.toContain('recurringRules');
     });
   });
 

@@ -26,11 +26,11 @@ Every task follows the same loop, and none of it is optional:
 | 1 | Core ledger | ✅ Done |
 | 2 | Budgets | ✅ Done |
 | 3 | Reports | ✅ Done |
-| 4 | Recurring transactions | ⬜ Next |
+| 4 | Recurring transactions | 🔄 In progress — 4.1 done |
 | 5 | Multi-currency | ⬜ Planned |
 | 6 | Release readiness | 🔄 6.5 done |
 
-Tests today: **335 client unit**, **33 end-to-end**, **84 Go**.
+Tests today: **341 client unit**, **33 end-to-end**, **84 Go**.
 
 ---
 
@@ -320,13 +320,44 @@ filtered transaction view that the Activity screen already provides.
 
 ---
 
-## Phase 4 — Recurring transactions ⬅ next
+## Phase 4 — Recurring transactions 🔄
 
 Goal: rent, salary and subscriptions appear without being typed monthly.
 
-### 4.1 Rule model
-- [ ] `RecurringRule` entity, Dexie `version(3)`
-- [ ] Schedule: interval + unit, optional end date, optional occurrence count
+### 4.1 Rule model ✅
+
+- [x] `RecurringRule` in `domain.ts` — a transaction template plus a schedule
+      (interval + unit, optional end date, optional occurrence cap, and the
+      occurrence dates the user has skipped)
+- [x] Dexie `version(3)` adding `recurringRules`
+- [x] `'recurringRules'` added to `ENTITY_NAMES`, from which `EntityName` and
+      the merge transaction's scope are both derived
+
+**The 2.1 repair held.** Adding budgets cost a bug — `merge` had a hardcoded
+table list and threw `NotFoundError` for any entity not in it. Adding recurring
+rules cost nothing: `ENTITY_NAMES` is the single source of truth, so the new
+entity replicated, merged and stayed encrypted without a line of new code in the
+sync engine. That is the return on fixing the cause rather than the symptom, and
+it is now asserted rather than assumed.
+
+**A rule is not a transaction.** It never appears in a balance. Transactions are
+materialised from it, so history stays a flat log of what actually happened and
+editing a rule tomorrow cannot silently rewrite what it produced last year.
+`nextDue` is deliberately not stored: it is derived from the schedule and what
+has already been materialised, and a cached copy would be one more thing for two
+devices to disagree about.
+
+**Tests** (6 added, 335 → 341)
+- [x] A v2 database with budgets in it upgrades to v3 with every row intact
+- [x] Rules move through put / remove / merge like any other entity
+- [x] A rule replicates between devices and stays unreadable at the destination
+
+**Also fixed: flaky tests.** Three dashboard tests failed on one run and passed
+on the next. The cause was a fixed 60ms sleep waiting for a Dexie `liveQuery` —
+long enough on an idle machine, not on a busy one. `core/testing/async.ts` now
+polls a condition instead, so a test returns as soon as its data arrives and
+fails only if it never does. The suite ran green four times consecutively
+afterwards.
 
 ### 4.2 Materialiser
 - [ ] On app open, emit ordinary transactions for every due occurrence
@@ -426,6 +457,23 @@ Real, currently unaddressed, and each one has a home above.
 | Android build needs JDK 21 | JDK 25 is rejected by this Gradle | Documented in `docs/DEPLOYMENT.md`; revisit on Gradle upgrade |
 
 ---
+
+## Testing notes
+
+Things learned the hard way, worth not relearning:
+
+- **Never sleep for a `liveQuery`.** Poll the condition (`core/testing/async.ts`).
+  A fixed span passes on an idle machine and fails on a loaded one.
+- **Scope every assertion to its screen.** Ionic keeps departed pages in the DOM,
+  and the Summary screen has cards whose titles repeat elsewhere. A page-wide
+  `textContent` check proves very little — one such assertion passed for entirely
+  the wrong reason in 2.4.
+- **`element.click()` is not a tap.** It bypasses hit-testing, which is why a
+  duplicate router outlet made every floating action button unclickable without
+  a single test noticing.
+- **Look at the thing.** Colour can be validated by script and geometry by
+  assertion; neither can see a stranded label or a chart that reads as broken.
+  Both chart tasks found a real defect that way and only that way.
 
 ## Ground rules carried forward
 

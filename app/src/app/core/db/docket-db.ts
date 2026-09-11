@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { Account, Budget, Category, Transaction } from '../models/domain';
+import { Account, Budget, Category, RecurringRule, Transaction } from '../models/domain';
 import { LocalOperation } from '../models/oplog';
 
 /**
@@ -11,7 +11,8 @@ import { LocalOperation } from '../models/oplog';
  * Two kinds of table live here:
  *
  *  - **Materialised entities** (`accounts`, `categories`, `transactions`,
- *    `budgets`) — the current state, indexed for the queries the UI makes.
+ *    `budgets`, `recurringRules`) — the current state, indexed for the queries
+ *    the UI makes.
  *  - **Replication bookkeeping** (`oplog`, `remoteObjects`, `meta`) — the
  *    append-only operation log plus a record of which remote objects have
  *    already been merged, so a repeated pull is cheap and idempotent.
@@ -35,6 +36,7 @@ export class DocketDb extends Dexie {
   categories!: Table<Category, string>;
   transactions!: Table<Transaction, string>;
   budgets!: Table<Budget, string>;
+  recurringRules!: Table<RecurringRule, string>;
   oplog!: Table<LocalOperation, string>;
   remoteObjects!: Table<RemoteObjectRecord, string>;
   meta!: Table<MetaRecord, string>;
@@ -64,6 +66,15 @@ export class DocketDb extends Dexie {
     // any adapter changes for this.
     this.version(2).stores({
       budgets: 'id, period, archived',
+    });
+
+    // v3 — recurring rules.
+    //
+    // `nextDue` is not stored: it is derived from the schedule and what has
+    // already been materialised, and a cached copy would be one more thing to
+    // keep correct across two devices that both ran the materialiser.
+    this.version(3).stores({
+      recurringRules: 'id, startDate, archived',
     });
   }
 }

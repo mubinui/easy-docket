@@ -4,7 +4,7 @@ import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { Operation } from '../models/oplog';
 import { encodeHlc } from '../util/hlc';
-import { aBudget, anAccount, aTransaction } from '../testing/factories';
+import { aBudget, aRecurringRule, anAccount, aTransaction } from '../testing/factories';
 import { LedgerService } from './ledger.service';
 
 /**
@@ -180,6 +180,44 @@ describe('LedgerService', () => {
       await ledger.remove('budgets', 'shared-id');
       expect(await db.accounts.get('shared-id')).toBeDefined();
       expect(await db.budgets.get('shared-id')).toBeUndefined();
+    });
+  });
+
+  describe('recurring rules', () => {
+    /**
+     * The second entity added since the sync engine was written. Task 2.1 found
+     * that `merge` had a hardcoded table list and replaced it with an iteration
+     * over `ENTITY_NAMES`; these tests are the check that the repair held.
+     */
+    it('records a rule like any other entity', async () => {
+      const saved = await ledger.put('recurringRules', aRecurringRule());
+
+      expect(await db.recurringRules.get('rule-1')).toEqual(saved);
+      expect(await ledger.allOperations()).toMatchObject([{ entity: 'recurringRules' }]);
+    });
+
+    it('merges a rule from another device without any new code path', async () => {
+      const applied = await ledger.merge([
+        {
+          hlc: stampAt(-1_000),
+          entity: 'recurringRules',
+          entityId: 'rule-9',
+          op: 'put',
+          value: aRecurringRule({ id: 'rule-9', name: 'Salary' }),
+          device: 'bbbbbbbb',
+        },
+      ]);
+
+      expect(applied).toBe(1);
+      expect((await db.recurringRules.get('rule-9'))?.name).toBe('Salary');
+    });
+
+    it('tombstones a deleted rule', async () => {
+      await ledger.put('recurringRules', aRecurringRule());
+      await ledger.remove('recurringRules', 'rule-1');
+
+      expect(await db.recurringRules.get('rule-1')).toBeUndefined();
+      expect((await ledger.allOperations()).map((o) => o.op)).toEqual(['put', 'delete']);
     });
   });
 
