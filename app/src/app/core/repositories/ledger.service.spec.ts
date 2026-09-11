@@ -221,6 +221,44 @@ describe('LedgerService', () => {
     });
   });
 
+  describe('entity history', () => {
+    it('remembers an entity that was created and then deleted', async () => {
+      // The table forgets; the log does not. The recurring materialiser depends
+      // on the difference, or a deleted occurrence would reappear every open.
+      await ledger.put('transactions', aTransaction({ id: 'txn-9' }));
+      await ledger.remove('transactions', 'txn-9');
+
+      expect(await db.transactions.get('txn-9')).toBeUndefined();
+      expect(await ledger.hasHistory('transactions', 'txn-9')).toBe(true);
+      expect(await ledger.hasHistory('transactions', 'never-existed')).toBe(false);
+    });
+
+    it('finds the highest id carrying a prefix', async () => {
+      for (const date of ['2026-01-15', '2026-03-15', '2026-02-15']) {
+        await ledger.put('transactions', aTransaction({ id: `rule-1:${date}`, date }));
+      }
+      await ledger.put('transactions', aTransaction({ id: 'rule-2:2026-09-01' }));
+
+      expect(await ledger.latestEntityIdWithPrefix('transactions', 'rule-1:')).toBe(
+        'rule-1:2026-03-15',
+      );
+    });
+
+    it('counts a deleted id towards the high-water mark', async () => {
+      await ledger.put('transactions', aTransaction({ id: 'rule-1:2026-01-15' }));
+      await ledger.put('transactions', aTransaction({ id: 'rule-1:2026-02-15' }));
+      await ledger.remove('transactions', 'rule-1:2026-02-15');
+
+      expect(await ledger.latestEntityIdWithPrefix('transactions', 'rule-1:')).toBe(
+        'rule-1:2026-02-15',
+      );
+    });
+
+    it('reports nothing for a prefix no entity uses', async () => {
+      expect(await ledger.latestEntityIdWithPrefix('transactions', 'rule-9:')).toBeNull();
+    });
+  });
+
   describe('merging remote operations', () => {
     function remoteOp(over: Partial<Operation> = {}): Operation {
       return {

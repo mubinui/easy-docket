@@ -2,6 +2,7 @@ import { DestroyRef, Injectable, effect, inject } from '@angular/core';
 import { App } from '@capacitor/app';
 import { Network } from '@capacitor/network';
 import { VaultService } from '../keys/vault.service';
+import { MaterialiserService } from '../recurring/materialiser.service';
 import { SyncSettingsService } from './sync-settings.service';
 import { SyncService } from './sync.service';
 
@@ -21,6 +22,7 @@ export class SyncSchedulerService {
   private readonly sync = inject(SyncService);
   private readonly settings = inject(SyncSettingsService);
   private readonly vault = inject(VaultService);
+  private readonly materialiser = inject(MaterialiserService);
   private readonly destroyRef = inject(DestroyRef);
 
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -55,6 +57,10 @@ export class SyncSchedulerService {
   /** Sync now, regardless of schedule. Used by pull-to-refresh and the button. */
   async syncNow(): Promise<void> {
     await this.sync.sync();
+    // A sync can bring rules created on another device, or a longer skip list.
+    // Materialising afterwards keeps the ledger consistent with what just
+    // arrived; it is idempotent, so doing it on every sync costs nothing.
+    await this.materialiser.run();
   }
 
   private async runIfUnlocked(): Promise<void> {
@@ -64,7 +70,7 @@ export class SyncSchedulerService {
       const status = await Network.getStatus();
       if (status.connectionType !== 'wifi') return;
     }
-    await this.sync.sync();
+    await this.syncNow();
   }
 
   private arm(intervalMinutes: number): void {

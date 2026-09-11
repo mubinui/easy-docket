@@ -26,11 +26,11 @@ Every task follows the same loop, and none of it is optional:
 | 1 | Core ledger | ✅ Done |
 | 2 | Budgets | ✅ Done |
 | 3 | Reports | ✅ Done |
-| 4 | Recurring transactions | 🔄 In progress — 4.1 done |
+| 4 | Recurring transactions | 🔄 In progress — 4.1, 4.2 done |
 | 5 | Multi-currency | ⬜ Planned |
 | 6 | Release readiness | 🔄 6.5 done |
 
-Tests today: **341 client unit**, **33 end-to-end**, **84 Go**.
+Tests today: **390 client unit**, **33 end-to-end**, **84 Go**.
 
 ---
 
@@ -359,19 +359,56 @@ polls a condition instead, so a test returns as soon as its data arrives and
 fails only if it never does. The suite ran green four times consecutively
 afterwards.
 
-### 4.2 Materialiser
-- [ ] On app open, emit ordinary transactions for every due occurrence
-- [ ] Idempotent per `(ruleId, occurrenceDate)` — this is the whole difficulty
+### 4.2 Materialiser ✅
 
-**Why it matters:** two devices opening the app on the same morning must not
-each create the rent transaction. The occurrence key has to be derived, not
-random, so both devices produce the same id and LWW collapses them into one.
+- [x] `core/recurring/schedule.ts` — pure: `occurrenceAt`, `occurrencesUpTo`,
+      `nextOccurrence`, `occurrenceId`
+- [x] `core/recurring/materialiser.service.ts` — creates due transactions, and
+      `skip` for an occurrence the user does not want
+- [x] Runs before the first paint on app open, and after every sync
 
-**Tests**
-- Catch-up after the app is unopened for months
-- Two simulated devices materialising the same occurrence produce one transaction
-- End date and occurrence-count limits respected
-- A rule edited mid-stream does not rewrite history already materialised
+**Three things make it safe to run at any moment, on any device.**
+
+*Derived identity.* A materialised transaction's id is `ruleId:date`, so two
+devices running on the same morning produce the **same** id and last-writer-wins
+collapses them into one row. A random id would give the user two rents — this is
+the whole reason the task existed, and there is a two-device test for it.
+
+*The log, not the table.* Before creating anything it asks whether that id has
+*ever* existed. A transaction the user deleted left a tombstone and no row;
+resurrecting it on every app open would be maddening. `LedgerService.hasHistory`
+and `latestEntityIdWithPrefix` answer from the operation log.
+
+*A bounded run.* A daily rule dated years back would otherwise produce thousands
+of rows in one pass and stall the first launch. Each run creates at most 500 and
+reports which rules have more to do.
+
+**Also: occurrences are measured from the start date, never from the previous
+one.** Stepping forward one at a time accumulates the month-length clamping — a
+rule anchored to the 31st would land on the 28th in February and then stay on
+the 28th forever. The clamping itself now lives in `addMonths` in
+`util/dates.ts`, shared with the budget periods, which had the identical problem
+and its own copy of the answer.
+
+**Tests** (49 added, 341 → 390)
+- [x] Schedule: every unit and interval, month-length clamping that does not
+      drag the schedule, leap-day anchors, end dates, occurrence caps, skipped
+      dates not earning a replacement, catch-up across a year, resume past a
+      watermark, and a nonsensical interval returning nothing rather than looping
+- [x] Materialiser: fields copied from the rule, transactions left uncleared
+      (the rule says money was due, not that it moved), nothing before the start
+      date, archived rules ignored, repeat runs creating nothing, a user's edit
+      not overwritten, a deleted occurrence not resurrected, two devices
+      converging on one transaction, bounded runs continuing where they left off,
+      and skip removing an occurrence already created
+- [x] Ledger: history surviving deletion, prefix high-water mark including
+      deleted ids
+
+**What it found.** The first bounded-run implementation could never catch up: it
+asked for "the first 500 occurrences" every time, and since a schedule always
+starts in the same place, that is a fixed answer — every run after the first
+created nothing. `occurrencesUpTo` now takes a resume point, and the materialiser
+reads it from the operation log.
 
 ### 4.3 UI
 - [ ] Rule list and editor; "skip this occurrence"; upcoming preview

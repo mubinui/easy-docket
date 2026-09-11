@@ -1,4 +1,5 @@
 import { inject } from '@angular/core';
+import { MaterialiserService } from './recurring/materialiser.service';
 import { VaultService } from './keys/vault.service';
 import { LedgerService } from './repositories/ledger.service';
 import { SyncSettingsService } from './sync/sync-settings.service';
@@ -30,8 +31,14 @@ export async function bootstrapApp(): Promise<void> {
   await ledger.initialise(vault.requireDeviceId());
 
   if (state === 'unlocked') {
+    const materialiser = inject(MaterialiserService);
+
     await settings.load();
     await sync.initialise();
+    // Standing instructions fall due whether or not the app was open. Running
+    // before the first paint means the ledger is already complete when the
+    // summary renders, rather than gaining rows under the user's eyes.
+    await materialiser.run();
     await scheduler.start();
     // Catch up in the background: the UI must not wait on the network.
     void scheduler.syncNow();
@@ -46,9 +53,11 @@ export async function activateVault(): Promise<void> {
   const settings = inject(SyncSettingsService);
   const sync = inject(SyncService);
   const scheduler = inject(SyncSchedulerService);
+  const materialiser = inject(MaterialiserService);
 
   await settings.load();
   await sync.initialise();
+  await materialiser.run();
   await scheduler.start();
   void scheduler.syncNow();
 }

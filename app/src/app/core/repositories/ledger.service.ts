@@ -155,6 +155,41 @@ export class LedgerService {
     });
   }
 
+  /**
+   * Whether an entity has ever existed, deletions included.
+   *
+   * The operation log is the authority, not the table: a row that was created
+   * and then deleted leaves a tombstone and no row. The recurring materialiser
+   * needs that distinction — a transaction the user deleted must not reappear
+   * the next time the app opens.
+   */
+  async hasHistory(entity: EntityName, entityId: string): Promise<boolean> {
+    return (await this.latestStampFor(entity, entityId)) !== null;
+  }
+
+  /**
+   * The highest entity id beginning with a prefix, deletions included.
+   *
+   * Asked of the operation log rather than the table, so an id that was created
+   * and later deleted still counts as known. The materialiser uses it to resume
+   * a catch-up where it left off instead of re-walking the whole schedule.
+   */
+  async latestEntityIdWithPrefix(entity: EntityName, prefix: string): Promise<string | null> {
+    const keys = (await this.db.oplog
+      .where('[entity+entityId]')
+      // `\uffff` is above every character that can appear in an id, so the
+      // range covers exactly the ids carrying this prefix.
+      .between([entity, prefix], [entity, `${prefix}\uffff`], true, true)
+      .keys()) as unknown as [EntityName, string][];
+
+    let latest: string | null = null;
+    for (const key of keys) {
+      const entityId = key[1];
+      if (latest === null || entityId > latest) latest = entityId;
+    }
+    return latest;
+  }
+
   /** Full operation history, used to seed a brand new remote destination. */
   async allOperations(): Promise<LocalOperation[]> {
     return this.db.oplog.orderBy('hlc').toArray();

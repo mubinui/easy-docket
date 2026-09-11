@@ -36,6 +36,49 @@ export function shiftMonth(range: DateRange, delta: number): DateRange {
   return currentMonth(new Date(anchor.getFullYear(), anchor.getMonth() + delta, 1));
 }
 
+/** Shift a date by whole days. */
+export function addDays(date: string, days: number): string {
+  const { year, month, day } = parts(date);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+
+  return format(
+    shifted.getUTCFullYear(),
+    shifted.getUTCMonth() + 1,
+    shifted.getUTCDate(),
+  );
+}
+
+/**
+ * Shift a date by whole months, clamping to the length of the target month.
+ *
+ * The 31st of January plus one month is the 28th of February, not the 3rd of
+ * March. Rolling over would drift a monthly schedule forward a few days every
+ * short month until rent fell due in the middle of the month.
+ */
+export function addMonths(date: string, months: number): string {
+  const { year, month, day } = parts(date);
+  const absolute = year * 12 + (month - 1) + months;
+  const targetYear = Math.floor(absolute / 12);
+  const targetMonth = (absolute % 12) + 1;
+
+  return format(targetYear, targetMonth, Math.min(day, daysInMonth(targetYear, targetMonth)));
+}
+
+/** Days in a month, 1-indexed. */
+export function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+function parts(date: string): { year: number; month: number; day: number } {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) throw new Error(`Expected a YYYY-MM-DD date, got "${date}"`);
+  return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+}
+
+function format(year: number, month: number, day: number): string {
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 /** `YYYY-MM` — the bucket key for monthly reporting. */
 export function monthKey(date: string): string {
   return date.slice(0, 7);

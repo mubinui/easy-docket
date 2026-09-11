@@ -1,4 +1,5 @@
 import { Budget, BudgetPeriod } from '../models/domain';
+import { addDays, addMonths, daysInMonth as monthLength } from '../util/dates';
 
 /**
  * Budget period arithmetic.
@@ -41,24 +42,21 @@ export function formatDate({ year, month, day }: Ymd): string {
 }
 
 export function daysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate();
+  return monthLength(year, month);
 }
 
-/** The day a given period begins. Index may be negative; callers clamp. */
+/**
+ * The day a given period begins. Index may be negative; callers clamp.
+ *
+ * The month-length clamping lives in `addMonths`, shared with the recurring
+ * schedule: a budget anchored to the 31st and a rule anchored to the 31st have
+ * exactly the same problem in February, and it should have one answer.
+ */
 export function windowStart(anchor: Anchor, index: number): string {
-  const start = parseDate(anchor.startDate);
-
   if (anchor.period === 'weekly') {
-    return shiftDays(start, index * 7);
+    return addDays(anchor.startDate, index * 7);
   }
-
-  const monthsForward = anchor.period === 'monthly' ? index : index * 12;
-  const absolute = start.year * 12 + (start.month - 1) + monthsForward;
-  const year = Math.floor(absolute / 12);
-  const month = (absolute % 12) + 1;
-
-  // A start day the target month does not have falls back to its last day.
-  return formatDate({ year, month, day: Math.min(start.day, daysInMonth(year, month)) });
+  return addMonths(anchor.startDate, anchor.period === 'monthly' ? index : index * 12);
 }
 
 /**
@@ -118,17 +116,8 @@ function estimateIndex(anchor: Anchor, date: string): number {
   return anchor.period === 'monthly' ? months : Math.floor(months / 12);
 }
 
-function shiftDays(from: Ymd, days: number): string {
-  const shifted = new Date(Date.UTC(from.year, from.month - 1, from.day + days));
-  return formatDate({
-    year: shifted.getUTCFullYear(),
-    month: shifted.getUTCMonth() + 1,
-    day: shifted.getUTCDate(),
-  });
-}
-
 function dayBefore(date: string): string {
-  return shiftDays(parseDate(date), -1);
+  return addDays(date, -1);
 }
 
 /** UTC milliseconds, used only for day counting, never for display. */
