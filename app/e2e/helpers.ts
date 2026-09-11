@@ -35,15 +35,31 @@ export async function waitForScreen(page: Page, screen: string): Promise<void> {
   await expect(page.locator(screen)).toBeVisible();
 }
 
+/**
+ * Type into a field by its label.
+ *
+ * Tries the `label` attribute first, then the rendered accessible name. Where a
+ * template interpolates the label — "Rate to {{ currency }}" — Angular sets a
+ * property and no attribute exists to match on, which is the same trap the
+ * select helper below works around.
+ */
 export async function fillField(
   page: Page,
   label: string,
   value: string,
   screen?: string,
 ): Promise<void> {
-  const field = (await surface(page, screen)).locator(`ion-input[label="${label}"] input`);
-  await field.waitFor({ state: 'visible' });
-  await field.fill(value);
+  const root = await surface(page, screen);
+
+  const byAttribute = root.locator(`ion-input[label="${label}"] input`);
+  const field = (await byAttribute.count())
+    ? byAttribute
+    : root.getByRole('textbox', { name: label, exact: true }).or(
+        root.getByRole('spinbutton', { name: label, exact: true }),
+      );
+
+  await field.first().waitFor({ state: 'visible' });
+  await field.first().fill(value);
 }
 
 /**

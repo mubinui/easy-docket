@@ -179,6 +179,22 @@ export interface RecurringRule {
 }
 
 /**
+ * Vault-wide settings, replicated so every device agrees.
+ *
+ * The reporting currency in particular *must* be vault-wide. Rates are stored
+ * on transactions as "units of the reporting currency", so if two devices
+ * disagreed about which currency that is, every rate one of them wrote would
+ * mean something different to the other. There is exactly one row, id `vault`.
+ */
+export interface VaultSettings {
+  id: 'vault';
+  /** The currency totals are expressed in. */
+  reportingCurrency: string;
+  createdAt: number;
+  updatedAt: string;
+}
+
+/**
  * Every entity the ledger stores and replicates.
  *
  * The list is the single source of truth, and `EntityName` is derived from it
@@ -193,6 +209,7 @@ export const ENTITY_NAMES = [
   'budgets',
   'recurringRules',
   'rates',
+  'vaultSettings',
 ] as const;
 
 export type EntityName = (typeof ENTITY_NAMES)[number];
@@ -204,6 +221,7 @@ export interface EntityMap {
   budgets: Budget;
   recurringRules: RecurringRule;
   rates: ExchangeRate;
+  vaultSettings: VaultSettings;
 }
 
 export type AnyEntity = EntityMap[EntityName];

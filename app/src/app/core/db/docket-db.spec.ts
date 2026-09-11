@@ -88,6 +88,7 @@ describe('DocketDb schema', () => {
       'recurringRules',
       'remoteObjects',
       'transactions',
+      'vaultSettings',
     ]);
     db.close();
   });

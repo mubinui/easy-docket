@@ -6,6 +6,7 @@ import {
   ExchangeRate,
   RecurringRule,
   Transaction,
+  VaultSettings,
 } from '../models/domain';
 import { LocalOperation } from '../models/oplog';
 
@@ -45,7 +46,7 @@ export interface MetaRecord {
  * literal that has to be edited on every bump — a test that needs changing
  * whenever the schema grows stops being a check and becomes a chore.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export class DocketDb extends Dexie {
   accounts!: Table<Account, string>;
@@ -54,6 +55,7 @@ export class DocketDb extends Dexie {
   budgets!: Table<Budget, string>;
   recurringRules!: Table<RecurringRule, string>;
   rates!: Table<ExchangeRate, string>;
+  vaultSettings!: Table<VaultSettings, string>;
   oplog!: Table<LocalOperation, string>;
   remoteObjects!: Table<RemoteObjectRecord, string>;
   meta!: Table<MetaRecord, string>;
@@ -102,6 +104,11 @@ export class DocketDb extends Dexie {
     // written before multi-currency simply do not carry them.
     this.version(4).stores({
       rates: 'id, date, [base+quote+date]',
+    });
+
+    // v5 — vault-wide settings. One row, so no index beyond the key.
+    this.version(5).stores({
+      vaultSettings: 'id',
     });
   }
 }

@@ -7,10 +7,12 @@ import {
   informationCircleOutline,
   lockClosedOutline,
   shieldOutline,
+  swapHorizontalOutline,
 } from 'ionicons/icons';
 import { VaultService } from '../../core/keys/vault.service';
 import { SyncSettingsService } from '../../core/sync/sync-settings.service';
 import { SyncService } from '../../core/sync/sync.service';
+import { RatesService } from '../../core/repositories/rates.service';
 import { ThemeChoice, ThemeService } from '../../core/theme/theme.service';
 import {
   IonContent,
@@ -70,6 +72,17 @@ import {
       </ion-list>
 
       <ion-list>
+        <ion-list-header><ion-label>Money</ion-label></ion-list-header>
+        <ion-item button routerLink="/rates" detail="true">
+          <ion-icon slot="start" name="swap-horizontal-outline" />
+          <ion-label>
+            <h3>Currencies and rates</h3>
+            <p>Totals shown in {{ rates.reportingCurrency() }}</p>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+
+      <ion-list>
         <ion-list-header><ion-label>Security</ion-label></ion-list-header>
         <ion-item button routerLink="/settings/security" detail="true">
           <ion-icon slot="start" name="shield-outline" />
@@ -99,6 +112,7 @@ import {
 })
 export class SettingsPage {
   readonly theme = inject(ThemeService);
+  readonly rates = inject(RatesService);
   private readonly settings = inject(SyncSettingsService);
   private readonly sync = inject(SyncService);
   private readonly vault = inject(VaultService);
@@ -140,6 +154,12 @@ export class SettingsPage {
   }
 
   constructor() {
-    addIcons({ cloudOutline, shieldOutline, lockClosedOutline, informationCircleOutline });
+    addIcons({
+      cloudOutline,
+      shieldOutline,
+      lockClosedOutline,
+      informationCircleOutline,
+      swapHorizontalOutline,
+    });
   }
 }

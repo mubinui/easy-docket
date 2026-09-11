@@ -27,10 +27,10 @@ Every task follows the same loop, and none of it is optional:
 | 2 | Budgets | ✅ Done |
 | 3 | Reports | ✅ Done |
 | 4 | Recurring transactions | ✅ Done |
-| 5 | Multi-currency | 🔄 In progress — 5.1 done |
+| 5 | Multi-currency | 🔄 In progress — 5.1, 5.2 done |
 | 6 | Release readiness | 🔄 6.5 done |
 
-Tests today: **435 client unit**, **42 end-to-end**, **84 Go**.
+Tests today: **461 client unit**, **49 end-to-end**, **84 Go**.
 
 ---
 
@@ -492,10 +492,49 @@ and enough to restore the decimal value a person would have computed.
 Schema assertions now compare against an exported `SCHEMA_VERSION` rather than a
 literal, so a version bump stops breaking three unrelated tests.
 
-### 5.2 Rate management and reporting currency
-- [ ] A reporting-currency setting
-- [ ] Enter, edit and delete rates; invert a quote rather than typing both
-- [ ] Prompt for a rate when recording a transaction in another currency
+### 5.2 Rate management and reporting currency ✅
+
+- [x] `VaultSettings` entity and Dexie `version(5)` — one row, replicated
+- [x] `RatesService` — quotes, pair summaries, lookup with inversion, and the
+      reporting currency
+- [x] `features/rates/rates.page.ts` at `/rates`, from Settings
+- [x] A rate field in the transaction editor when the account is foreign,
+      prefilled from the last known quote and showing what it converts to
+
+**The reporting currency is vault-wide, not per-device.** Rates are stored on
+transactions as "units of the reporting currency", so two devices disagreeing
+about which currency that is would make every stored rate ambiguous. It is
+therefore a replicated entity rather than a local preference, and changing it
+warns that older figures stay quoted against the currency they were recorded in.
+
+**No automatic rate fetch.** Every rate provider is a third party who would
+learn which currencies this vault deals in — precisely the leak the rest of the
+app avoids. Rates change slowly enough that typing one occasionally is a fair
+trade. One quote is inverted rather than asking for both directions.
+
+**The editor states the conversion in words.** "Worth $49.50 · 1 EUR = 1.1 USD"
+is where a mistyped rate is caught, rather than in a total months later.
+
+**Tests** (26 unit added, 435 → 461; 7 end-to-end, 42 → 49)
+- [x] Service: reporting currency stored through the ledger, currency-code
+      validation, a quote replacing rather than duplicating the same day,
+      forward carry, inversion, pair summaries
+- [x] Editor: no rate asked for in the reporting currency, prefill from the last
+      known quote, the conversion shown, the rate stored on the transaction, and
+      **no rate stored when none is needed** — carrying one would invite a
+      future reader to apply it
+
+**What it found.** The rate was only suggested when the account *changed*, so if
+the default account was itself foreign the field sat empty beside a rate that
+was already known. Accounts are listed by name, and "Euro account" sorts before
+"Everyday" — so this was not a corner case. The suggestion now also runs when
+the editor opens, reading the current value untracked so the initialising effect
+cannot re-trigger itself.
+
+Worth recording how it was found: the component tests all passed, and only the
+browser disagreed. Instrumenting the running app — dumping the editor's computed
+state into a data attribute — showed the account had never changed at all,
+because it was already the default.
 
 ### 5.3 Conversion applied
 - [ ] Balances, net worth, budgets and reports converted

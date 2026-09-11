@@ -1,13 +1,25 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Transaction, TransactionKind } from '../../core/models/domain';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
+import { RatesService } from '../../core/repositories/rates.service';
 import { TransactionsService } from '../../core/repositories/transactions.service';
 import { toIsoDate } from '../../core/util/dates';
-import { formatAmount, parseAmount } from '../../core/util/money';
+import { convert } from '../../core/money/conversion';
+import { formatAmount, formatMoney, parseAmount } from '../../core/util/money';
 import {
   IonButton,
+  IonNote,
   IonButtons,
   IonContent,
   IonHeader,
@@ -36,7 +48,7 @@ import {
 @Component({
   selector: 'app-transaction-editor',
   standalone: true,
-  imports: [FormsModule, IonButton, IonButtons, IonContent, IonHeader, IonInput, IonItem, IonLabel, IonList, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonText, IonTitle, IonToggle, IonToolbar],
+  imports: [FormsModule, IonButton, IonButtons, IonContent, IonHeader, IonInput, IonItem, IonLabel, IonList, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonText, IonTitle, IonToggle, IonToolbar, IonNote],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -75,7 +87,7 @@ import {
             label="{{ kind() === 'transfer' ? 'From account' : 'Account' }}"
             labelPlacement="stacked"
             [ngModel]="accountId()"
-            (ngModelChange)="accountId.set($event)"
+            (ngModelChange)="setAccount($event)"
           >
             @for (account of accounts.active(); track account.id) {
               <ion-select-option [value]="account.id">{{ account.name }}</ion-select-option>
@@ -128,7 +140,7 @@ import {
             labelPlacement="stacked"
             type="date"
             [ngModel]="date()"
-            (ngModelChange)="date.set($event)"
+            (ngModelChange)="setDate($event)"
           />
         </ion-item>
 
@@ -146,6 +158,35 @@ import {
             Cleared
           </ion-toggle>
         </ion-item>
+
+        @if (needsRate()) {
+          <!--
+            The rate is stored on the transaction, so it has to be known now.
+            It is prefilled with the last one recorded and shown converted, so a
+            mistyped figure is obvious before saving rather than months later.
+          -->
+          <ion-item>
+            <ion-input
+              label="Rate to {{ reportingCurrency() }}"
+              labelPlacement="stacked"
+              type="number"
+              inputmode="decimal"
+              [ngModel]="rate()"
+              (ngModelChange)="rate.set($event)"
+            />
+          </ion-item>
+          <ion-item lines="none">
+            <ion-note>
+              @if (converted()) {
+                Worth {{ converted() }} · 1 {{ currency() }} = {{ rate() }}
+                {{ reportingCurrency() }}
+              } @else {
+                Enter what one {{ currency() }} was worth in
+                {{ reportingCurrency() }} on this date.
+              }
+            </ion-note>
+          </ion-item>
+        }
       </ion-list>
 
       @if (error()) {
@@ -166,6 +207,7 @@ export class TransactionEditorComponent {
   readonly accounts = inject(AccountsService);
   readonly categories = inject(CategoriesService);
   private readonly transactions = inject(TransactionsService);
+  private readonly rates = inject(RatesService);
 
   /** The transaction being edited, or null to create a new one. */
   readonly existing = input<Transaction | null>(null);
@@ -183,7 +225,35 @@ export class TransactionEditorComponent {
   readonly note = signal('');
   readonly date = signal(toIsoDate());
   readonly cleared = signal(true);
+  readonly rate = signal<string>('');
   readonly error = signal<string | null>(null);
+
+  /** The account's currency, which is what the amount is expressed in. */
+  readonly currency = computed(
+    () => this.accounts.byId(this.accountId() ?? '')?.currency ?? this.rates.reportingCurrency(),
+  );
+
+  /** A rate is only wanted when the account is in another currency. */
+  readonly needsRate = computed(
+    () => this.currency().toUpperCase() !== this.rates.reportingCurrency().toUpperCase(),
+  );
+
+  /** What the entered rate makes this worth, so a mistyped rate is visible. */
+  readonly converted = computed(() => {
+    const value = Number(this.rate());
+    const amount = Number.parseFloat(this.amount().replace(',', '.'));
+    if (!Number.isFinite(value) || value <= 0 || !Number.isFinite(amount)) return null;
+
+    try {
+      const minor = parseAmount(this.amount(), this.currency());
+      return formatMoney(
+        convert(minor, value, this.currency(), this.rates.reportingCurrency()),
+        this.rates.reportingCurrency(),
+      );
+    } catch {
+      return null;
+    }
+  });
 
   readonly categoryOptions = computed(() =>
     this.categories.forKind(this.kind() === 'income' ? 'income' : 'expense'),
@@ -208,6 +278,7 @@ export class TransactionEditorComponent {
         this.note.set(txn.note);
         this.date.set(txn.date);
         this.cleared.set(txn.cleared);
+        this.rate.set(txn.rate !== undefined ? String(txn.rate) : '');
       } else {
         this.kind.set('expense');
         this.amount.set('');
@@ -218,16 +289,50 @@ export class TransactionEditorComponent {
         this.note.set('');
         this.date.set(toIsoDate());
         this.cleared.set(true);
+        this.rate.set('');
       }
       this.error.set(null);
+
+      // Also on open, not only on change: the default account may itself be in
+      // another currency, in which case the field would otherwise sit empty
+      // with a rate already known.
+      this.suggestRate();
     });
   }
+
+  readonly reportingCurrency = computed(() => this.rates.reportingCurrency());
 
   setKind(kind: TransactionKind): void {
     this.kind.set(kind);
     // A category from the other direction would be meaningless, and a transfer
     // has no category at all.
     this.categoryId.set(null);
+  }
+
+  /** Changing the account can change the currency, and so whether a rate is needed. */
+  setAccount(accountId: string): void {
+    this.accountId.set(accountId);
+    this.suggestRate();
+  }
+
+  /** A rate is quoted for a day, so moving the date can change which one applies. */
+  setDate(date: string): void {
+    this.date.set(date);
+    this.suggestRate();
+  }
+
+  /**
+   * Offer the last rate recorded for this currency and date, if there is one.
+   *
+   * The current value is read untracked: this runs from the initialising
+   * effect, and an effect that both reads and writes `rate` would re-run
+   * itself forever.
+   */
+  suggestRate(): void {
+    if (!this.needsRate() || untracked(this.rate).trim() !== '') return;
+
+    const suggestion = this.rates.rateToReporting(this.currency(), this.date());
+    if (suggestion !== null) this.rate.set(String(suggestion));
   }
 
   async save(): Promise<void> {
@@ -252,6 +357,12 @@ export class TransactionEditorComponent {
         note: this.note().trim(),
         tags: this.existing()?.tags ?? [],
         cleared: this.cleared(),
+        // Only stored when it means something: a transaction already in the
+        // reporting currency needs no rate, and carrying one would invite a
+        // future reader to apply it.
+        ...(this.needsRate() && Number(this.rate()) > 0
+          ? { rate: Number(this.rate()), rateDate: this.date() }
+          : {}),
         createdAt: this.existing()?.createdAt ?? Date.now(),
       });
       this.saved.emit(saved);

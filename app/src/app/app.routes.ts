@@ -53,6 +53,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/recurring/rules.page').then((m) => m.RulesPage),
   },
   {
+    path: 'rates',
+    canActivate: [vaultGuard],
+    loadComponent: () => import('./features/rates/rates.page').then((m) => m.RatesPage),
+  },
+  {
     path: 'reports',
     canActivate: [vaultGuard],
     loadComponent: () => import('./features/reports/reports.page').then((m) => m.ReportsPage),
