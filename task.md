@@ -28,9 +28,9 @@ Every task follows the same loop, and none of it is optional:
 | 3 | Reports | ⬜ Next |
 | 4 | Recurring transactions | ⬜ Planned |
 | 5 | Multi-currency | ⬜ Planned |
-| 6 | Release readiness | ⬜ Planned |
+| 6 | Release readiness | 🔄 6.5 done |
 
-Tests today: **204 client**, **84 Go**.
+Tests today: **207 client unit**, **26 end-to-end**, **84 Go**.
 
 ---
 
@@ -273,8 +273,34 @@ its own history is unsettling.
 - [ ] **6.3 Oplog compaction** — see Known gaps.
 - [ ] **6.4 Play Store signing** — `signingConfigs` wired to
       `keystore.properties`, release workflow producing a signed `.aab`.
-- [ ] **6.5 E2E suite in CI** — the CDP script used during the build becomes a
-      committed Playwright suite covering create-vault → record → sync → reload.
+- [x] **6.5 E2E suite in CI** ✅ — Playwright, 26 tests, running the real Go
+      sync server rather than a mock. `app/e2e/`, wired into CI as its own job.
+
+  **What it found — three real bugs that every other check had passed.**
+
+  1. **A duplicate router outlet swallowed taps.** `IonTabs` renders its own
+     `ion-router-outlet`; `tabs.page.ts` declared a second one, which was
+     projected on top as an empty absolutely-positioned layer. Every floating
+     action button was unclickable. The unit tests never touch hit-testing, and
+     the earlier CDP scripts called `element.click()`, which bypasses it — so a
+     real finger was the first thing that would have hit this.
+  2. **"Test connection" reported success with a wrong token.** `ServerAdapter.probe`
+     only called `/v1/health`, which is unauthenticated by design. The one
+     control whose entire job is catching a bad token before it becomes a silent
+     background failure was not checking it. It now probes an authenticated
+     listing as well.
+  3. Assorted selector-level truths about Ionic worth recording: segment buttons
+     and selects sit above their own shadow content, so the host must be clicked
+     rather than the inner `role="tab"`/`role="button"` element; interpolated
+     labels become properties, not attributes, so `[label="…"]` cannot find them;
+     and `ion-title` is plain text, not a heading landmark.
+
+  **Notes for writing more of these.** Ionic's page transitions are disabled for
+  the run via `window.Ionic.config` in `e2e/fixtures.ts` — set before the bundle
+  loads, so nothing in the app bends toward the tests. Screens are addressed by
+  component selector (`app-accounts`) because Ionic keeps departed pages in the
+  DOM. The sync spec reads the server's data directory directly, which is the
+  only way to prove the zero-knowledge claim rather than assert it.
 
 ---
 
@@ -285,7 +311,8 @@ Real, currently unaddressed, and each one has a home above.
 | Gap | Impact | Where it gets fixed |
 | --- | --- | --- |
 | `oplog` grows without bound | A long-lived vault re-downloads its whole history on a new device | 6.3 — periodic snapshot objects plus a compaction watermark |
-| Git adapter has no integration test | Only unit-level coverage; a real push is unproven | 6.5, against a local git-http-backend |
+| Git adapter has no integration test | Only unit-level coverage; a real push is unproven | Still open — 6.5 covers the server adapter end to end, but a Git remote needs a local git-http-backend in CI |
+| S3 adapter has no integration test | Same; a MinIO container in CI would close it | Unscheduled |
 | No rate limiting on the server | A leaked token can be used to exhaust disk | Server hardening, unscheduled — quotas blunt it today |
 | Single currency assumed in UI totals | Dashboard uses the first account's currency | Phase 5 |
 | Category deletion leaves transactions uncategorised | Silent, no warning | Small fix, fold into 2.3 |

@@ -55,8 +55,23 @@ export class ServerAdapter implements SyncAdapter {
     });
   }
 
+  /**
+   * Check reachability *and* credentials.
+   *
+   * Two requests rather than one, because they fail for different reasons and
+   * the user needs to be told which. `/v1/health` is deliberately
+   * unauthenticated — it exists for load balancers — so probing it alone would
+   * report "connected successfully" for a mistyped token and leave the real
+   * failure to surface later as a silent background sync error. The listing
+   * request is read-only and writes nothing.
+   */
   async probe(): Promise<void> {
     await this.request(this.url('v1/health'), { method: 'GET' });
+
+    const objects = this.url('v1/objects');
+    objects.searchParams.set('prefix', 'vaults/');
+    objects.searchParams.set('limit', '1');
+    await this.request(objects, { method: 'GET' });
   }
 
   /**

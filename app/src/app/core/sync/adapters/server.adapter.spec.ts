@@ -76,6 +76,35 @@ describe('ServerAdapter', () => {
     expect(objects.map((o) => o.name)).toEqual(['a', 'b']);
   });
 
+  describe('probe', () => {
+    it('checks credentials, not just reachability', async () => {
+      const { impl, calls } = stubFetch(
+        jsonResponse({ status: 'ok' }),
+        jsonResponse({ objects: [] }),
+      );
+      await new ServerAdapter(target, impl).probe();
+
+      // `/v1/health` is unauthenticated by design, so probing it alone would
+      // report success for a wrong token.
+      expect(calls).toHaveLength(2);
+      expect(calls[0].url).toContain('/v1/health');
+      expect(calls[1].url).toContain('/v1/objects');
+    });
+
+    it('fails on a rejected token even when the server is reachable', async () => {
+      const { impl } = stubFetch(jsonResponse({ status: 'ok' }), jsonResponse({}, 401));
+
+      await expect(new ServerAdapter(target, impl).probe()).rejects.toThrow(/401/);
+    });
+
+    it('writes nothing', async () => {
+      const { impl, calls } = stubFetch(jsonResponse({ status: 'ok' }), jsonResponse({ objects: [] }));
+      await new ServerAdapter(target, impl).probe();
+
+      expect(calls.every((call) => (call.init.method ?? 'GET') === 'GET')).toBe(true);
+    });
+  });
+
   it('treats a network failure as retryable, because the device is probably offline', async () => {
     const impl = vi.fn(async () => {
       throw new TypeError('Failed to fetch');

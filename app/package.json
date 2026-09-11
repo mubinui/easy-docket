@@ -15,7 +15,10 @@
     "cap:sync": "ng build && cap sync android",
     "android:open": "npm run cap:sync && cap open android",
     "android:build": "npm run cap:sync && cd android && ./gradlew assembleRelease",
-    "android:bundle": "npm run cap:sync && cd android && ./gradlew bundleRelease"
+    "android:bundle": "npm run cap:sync && cd android && ./gradlew bundleRelease",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:ci": "ng build && playwright test"
   },
   "private": true,
   "dependencies": {
@@ -52,10 +55,12 @@
     "@angular/language-service": "22.0.1",
     "@capacitor/cli": "8.5.1",
     "@ionic/angular-toolkit": "^13.0.0",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.20.2",
     "angular-eslint": "22.0.0",
     "eslint": "^9.16.0",
     "fake-indexeddb": "^6.2.5",
+    "http-server": "^14.1.1",
     "jsdom": "^26.0.0",
     "typescript": "~6.0.0",
     "typescript-eslint": "^8.61.0",

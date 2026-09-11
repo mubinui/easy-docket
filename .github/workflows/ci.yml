@@ -38,6 +38,45 @@ jobs:
           path: app/www
           retention-days: 7
 
+  e2e:
+    name: End-to-end (browser + sync server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # The suite runs the real Go sync server, not a mock: the zero-knowledge
+      # assertion reads what actually lands on its disk.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+
+      - name: Install
+        working-directory: app
+        run: npm ci
+
+      - name: Install Chrome
+        working-directory: app
+        run: npx playwright install --with-deps chrome
+
+      - name: Run
+        working-directory: app
+        run: npm run e2e:ci
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            app/playwright-report
+            app/test-results
+          retention-days: 7
+
   server:
     name: Sync server (Go)
     runs-on: ubuntu-latest

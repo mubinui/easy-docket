@@ -28,6 +28,12 @@ app/android/app/release/
 *.jks
 keystore.properties
 
+# End-to-end test artefacts
+app/test-results/
+app/playwright-report/
+app/blob-report/
+app/.e2e-data/
+
 # Server runtime state
 server/.data/
 server/.tokens

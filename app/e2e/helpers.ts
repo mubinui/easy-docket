@@ -1,0 +1,192 @@
+import { expect, Locator, Page } from '@playwright/test';
+
+/**
+ * Interaction helpers for Ionic's web components.
+ *
+ * Two things make a plain `page.getByLabel(...)` unreliable here. Ionic keeps
+ * previous pages in the DOM and hides them, so an unscoped selector can match a
+ * control on a screen the user left minutes ago; and `ion-select` opens its
+ * options in an overlay attached to the document root rather than inline.
+ *
+ * Both are handled once, here, so the specs read like descriptions of what a
+ * person does rather than like DOM archaeology.
+ */
+export const PASSPHRASE = 'correct horse battery staple';
+
+/** Component selectors, which are the most stable handle on "which screen". */
+export const Screen = {
+  vault: 'app-vault',
+  dashboard: 'app-dashboard',
+  accounts: 'app-accounts',
+  transactions: 'app-transactions',
+  budgets: 'app-budgets',
+  settings: 'app-settings',
+} as const;
+
+/** The open modal if there is one, else the named screen. */
+export async function surface(page: Page, screen?: string): Promise<Locator> {
+  const modal = page.locator('ion-modal.show-modal');
+  if ((await modal.count()) > 0) return modal;
+  return screen ? page.locator(screen) : page.locator('.ion-page:not(.ion-page-hidden)').last();
+}
+
+/** Wait until a screen is the one on top. */
+export async function waitForScreen(page: Page, screen: string): Promise<void> {
+  await expect(page.locator(screen)).toBeVisible();
+}
+
+export async function fillField(
+  page: Page,
+  label: string,
+  value: string,
+  screen?: string,
+): Promise<void> {
+  const field = (await surface(page, screen)).locator(`ion-input[label="${label}"] input`);
+  await field.waitFor({ state: 'visible' });
+  await field.fill(value);
+}
+
+/**
+ * Choose an option from an `ion-select`, driving the overlay it opens.
+ *
+ * Selects are found by their rendered label rather than a `label` attribute:
+ * where the template interpolates the label (the transaction editor's account
+ * field, which reads "Account" or "From account" depending on the kind) Angular
+ * sets a property and no attribute exists to match on.
+ */
+export async function chooseOption(
+  page: Page,
+  label: string,
+  option: string,
+  screen?: string,
+): Promise<void> {
+  // Ionic renders the label inside the select's shadow DOM, where a text filter
+  // cannot reach it, but it does surface an inner button whose accessible name
+  // starts with the label. The host is clicked rather than that button: the
+  // host sits above its own shadow content and would intercept the click.
+  const select = (await surface(page, screen))
+    .locator('ion-select')
+    .filter({
+      has: page.getByRole('button', { name: new RegExp(`^${escapeForRegExp(label)}\\b`) }),
+    })
+    .first();
+
+  await select.waitFor({ state: 'visible' });
+  await select.click();
+
+  const overlay = page.locator('ion-alert');
+  await overlay.waitFor({ state: 'visible' });
+  await overlay
+    .getByRole('radio', { name: option })
+    .or(overlay.getByRole('checkbox', { name: option }))
+    .click();
+  await overlay.getByRole('button', { name: 'OK' }).click();
+  await overlay.waitFor({ state: 'hidden' });
+}
+
+/**
+ * Choose one of an `ion-segment`'s options.
+ *
+ * The host element is clicked rather than the `role="tab"` button inside it:
+ * the host sits above its own shadow content, so a click aimed at the inner
+ * button is intercepted by the very element that contains it.
+ */
+export async function chooseSegment(page: Page, label: string): Promise<void> {
+  await (await surface(page))
+    .locator('ion-segment-button')
+    .filter({ hasText: label })
+    .click();
+}
+
+export async function tap(page: Page, text: string, screen?: string): Promise<void> {
+  await (await surface(page, screen)).getByRole('button', { name: text }).first().click();
+}
+
+export async function goToTab(page: Page, name: string, screen: string): Promise<void> {
+  // Screens pushed above the tabs — budgets, sync settings — hide the tab bar.
+  // Coming back first is what a person does, and it keeps the specs from having
+  // to know which screen they happen to be on.
+  const bar = page.locator('ion-tab-bar');
+  // Wait for the shell to exist before asking where we are: straight after an
+  // unlock the tabs are still being created, and a premature check would send
+  // us hunting for a back button that is not there either.
+  await page.locator('ion-tab-bar, ion-back-button').first().waitFor({ state: 'attached' });
+
+  if (!(await bar.isVisible())) {
+    await page.locator('ion-back-button').first().click();
+    await expect(bar).toBeVisible();
+  }
+
+  await bar.locator('ion-tab-button').filter({ hasText: name }).click();
+  await waitForScreen(page, screen);
+}
+
+export async function tapAdd(page: Page, screen: string): Promise<void> {
+  await page.locator(`${screen} ion-fab-button`).click();
+  await expect(page.locator('ion-modal.show-modal')).toBeVisible();
+}
+
+/** Create a vault and land on the summary screen. */
+export async function createVault(page: Page, passphrase = PASSPHRASE): Promise<void> {
+  await page.goto('/');
+  await expect(page.getByText('Set up your vault')).toBeVisible();
+
+  await fillField(page, 'Passphrase', passphrase, Screen.vault);
+  await fillField(page, 'Confirm passphrase', passphrase, Screen.vault);
+  await tap(page, 'Create vault', Screen.vault);
+
+  await expect(page).toHaveURL(/\/tabs\/dashboard/);
+  await waitForScreen(page, Screen.dashboard);
+}
+
+/** Enter a passphrase and submit. Does not assume the unlock succeeds. */
+export async function unlock(page: Page, passphrase = PASSPHRASE): Promise<void> {
+  await fillField(page, 'Passphrase', passphrase, Screen.vault);
+  await tap(page, 'Unlock', Screen.vault);
+}
+
+/** Unlock and wait for the ledger to be on screen. */
+export async function unlockToLedger(page: Page, passphrase = PASSPHRASE): Promise<void> {
+  await unlock(page, passphrase);
+  await expect(page).toHaveURL(/\/tabs\/dashboard/);
+  await waitForScreen(page, Screen.dashboard);
+}
+
+export async function addAccount(page: Page, name: string, opening: string): Promise<void> {
+  await goToTab(page, 'Accounts', Screen.accounts);
+  await tapAdd(page, Screen.accounts);
+
+  await fillField(page, 'Name', name);
+  await fillField(page, 'Opening balance', opening);
+  await tap(page, 'Save');
+
+  await expect(page.locator(Screen.accounts).getByRole('heading', { name })).toBeVisible();
+}
+
+export async function addExpense(
+  page: Page,
+  amount: string,
+  payee: string,
+  category?: string,
+): Promise<void> {
+  await goToTab(page, 'Activity', Screen.transactions);
+  await tapAdd(page, Screen.transactions);
+
+  await fillField(page, 'Amount', amount);
+  if (category) await chooseOption(page, 'Category', category);
+  await fillField(page, 'Payee', payee);
+  await tap(page, 'Save');
+
+  await expect(page.locator(Screen.transactions).getByRole('heading', { name: payee })).toBeVisible();
+}
+
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** A named card on the summary screen. */
+export function summaryCard(page: Page, title: string): Locator {
+  return page
+    .locator(`${Screen.dashboard} ion-card`)
+    .filter({ has: page.getByRole('heading', { name: title }) });
+}

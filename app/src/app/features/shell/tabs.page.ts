@@ -1,23 +1,20 @@
 import { Component } from '@angular/core';
 import { addIcons } from 'ionicons';
 import { listOutline, pieChartOutline, settingsOutline, walletOutline } from 'ionicons/icons';
-import {
-  IonIcon,
-  IonLabel,
-  IonRouterOutlet,
-  IonTabBar,
-  IonTabButton,
-  IonTabs,
-} from '@ionic/angular';
+import { IonIcon, IonLabel, IonTabBar, IonTabButton, IonTabs } from '@ionic/angular';
 
 @Component({
   selector: 'app-tabs',
   standalone: true,
-  imports: [IonIcon, IonLabel, IonRouterOutlet, IonTabBar, IonTabButton, IonTabs],
+  imports: [IonIcon, IonLabel, IonTabBar, IonTabButton, IonTabs],
   template: `
+    <!--
+      No <ion-router-outlet> here: IonTabs renders its own inside .tabs-inner.
+      Declaring a second one projects an empty, absolutely-positioned outlet
+      over the tab content, which silently swallows taps in the area it covers —
+      the floating action buttons among them.
+    -->
     <ion-tabs>
-      <ion-router-outlet />
-
       <ion-tab-bar slot="bottom">
         <ion-tab-button tab="dashboard" href="/tabs/dashboard">
           <ion-icon name="pie-chart-outline" />
