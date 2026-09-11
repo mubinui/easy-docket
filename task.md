@@ -28,9 +28,9 @@ Every task follows the same loop, and none of it is optional:
 | 3 | Reports | ✅ Done |
 | 4 | Recurring transactions | ✅ Done |
 | 5 | Multi-currency | ✅ Done |
-| 6 | Release readiness | 🔄 6.1, 6.5 done |
+| 6 | Release readiness | 🔄 6.1, 6.3, 6.5 done |
 
-Tests today: **528 client unit**, **57 end-to-end**, **84 Go**.
+Tests today: **537 client unit**, **57 end-to-end**, **84 Go**.
 
 ---
 
@@ -621,7 +621,36 @@ the vault's reporting currency. Both corrected.
   the right call for not confirming anything to someone holding a file they
   should not have.
 - [ ] **6.2 Biometric unlock** on Android, gating keystore retrieval.
-- [ ] **6.3 Oplog compaction** — see Known gaps.
+- [x] **6.3 Oplog compaction** ✅ — snapshots, so joining a long-lived vault no
+      longer means replaying every batch ever written.
+
+  **A snapshot is materially a batch of operations reconstructed from current
+  state** — every entity, stamped with the clock value it last changed at. That
+  is the whole trick: it can then be applied through the ordinary merge path,
+  which means all the existing rules hold for free, including that a delete made
+  *after* the snapshot is not undone by it. There is a test for exactly that.
+
+  It is written once `SNAPSHOT_AFTER_OPERATIONS` (200) operations have
+  accumulated past the last one, and applied only by a device that has nothing
+  yet — a device already following the vault has the history, and re-applying
+  would be work for nothing.
+
+  **The operations are left in place.** A snapshot makes the download cheap, not
+  the history disposable; actually removing what it covers needs a `delete` the
+  adapters do not have. That remains open below.
+
+  **Tests** (9 added, 528 → 537) — a snapshot written only past the threshold and
+  not again until the next one, staying encrypted, a new device reaching the same
+  ledger from far fewer objects, operations after the snapshot still applied, a
+  post-snapshot delete not resurrected, and a device that already has the history
+  ignoring it.
+
+  **Two real bugs found while testing.** Objects skipped because a snapshot
+  covered them were not recorded as applied, so the *next* sync — which has no
+  snapshot to apply, having just gained the history — saw them as unknown and
+  downloaded every one. And a device that had just applied a snapshot
+  immediately wrote its own, meaning every new device added a duplicate;
+  applying one now records it as the snapshot this device knows about.
 - [ ] **6.4 Play Store signing** — `signingConfigs` wired to
       `keystore.properties`, release workflow producing a signed `.aab`.
 - [x] **6.5 E2E suite in CI** ✅ — Playwright, 26 tests, running the real Go
@@ -661,7 +690,9 @@ Real, currently unaddressed, and each one has a home above.
 
 | Gap | Impact | Where it gets fixed |
 | --- | --- | --- |
-| `oplog` grows without bound | A long-lived vault re-downloads its whole history on a new device | 6.3 — periodic snapshot objects plus a compaction watermark |
+| ~~A long-lived vault re-downloads its whole history on a new device~~ | — | ✅ Closed in 6.3 (snapshots) |
+| Objects a snapshot covers are never removed from the destination | Storage grows forever, though downloads no longer do | Open. Needs a `delete` on the adapter contract, plus a DELETE endpoint on the server and the S3/Git equivalents |
+| `MaterialiserService.run` writes up to 500 rows one at a time | Slow enough that a test had to cap it; a first launch catching up years would feel it | Open — batch the writes if it ever matters |
 | Git adapter has no integration test | Only unit-level coverage; a real push is unproven | Still open — 6.5 covers the server adapter end to end, but a Git remote needs a local git-http-backend in CI |
 | S3 adapter has no integration test | Same; a MinIO container in CI would close it | Unscheduled |
 | No rate limiting on the server | A leaked token can be used to exhaust disk | Server hardening, unscheduled — quotas blunt it today |

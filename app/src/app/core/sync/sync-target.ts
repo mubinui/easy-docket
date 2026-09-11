@@ -91,6 +91,33 @@ export function opsObjectName(vaultId: string, head: string): string {
 }
 
 /**
+ * Snapshots live beside the operations they summarise.
+ *
+ * A device joining a long-lived vault takes the newest snapshot and only the
+ * operations after it, rather than replaying every batch ever written. The
+ * operations stay where they are — a snapshot makes the download cheap, not the
+ * history disposable.
+ */
+export function snapshotPrefix(vaultId: string): string {
+  return `vaults/${vaultId}/snapshots/`;
+}
+
+export function snapshotObjectName(vaultId: string, watermark: string): string {
+  return `${snapshotPrefix(vaultId)}${watermark}.edk`;
+}
+
+/**
+ * The clock stamp an object is named after.
+ *
+ * Names sort by stamp, so this is how a pull decides which objects a snapshot
+ * already covers without downloading them.
+ */
+export function stampFromObjectName(name: string): string | null {
+  const match = /\/([0-9]{19}-[0-9a-f]{4}-[A-Za-z0-9]+)\.edk$/.exec(name);
+  return match ? match[1] : null;
+}
+
+/**
  * Redact a target for logging or diagnostics. Nothing in the app should ever
  * print a `SyncTarget` without going through this.
  */

@@ -41,7 +41,15 @@ export class MaterialiserService {
   private readonly db: DocketDb = inject(DOCKET_DB);
   private readonly ledger = inject(LedgerService);
 
-  async run(asOf = toIsoDate()): Promise<MaterialisationResult> {
+  /**
+   * `limit` is the most occurrences one run will create. It is a parameter so a
+   * test can exercise resumption without writing a thousand rows to prove a
+   * rule that holds at any size.
+   */
+  async run(
+    asOf = toIsoDate(),
+    limit = MAX_OCCURRENCES_PER_RUN,
+  ): Promise<MaterialisationResult> {
     const rules = await this.db.recurringRules.filter((rule) => !rule.archived).toArray();
 
     let created = 0;
@@ -57,8 +65,8 @@ export class MaterialiserService {
       );
       const after = furthest ? (parseOccurrenceId(furthest)?.date ?? null) : null;
 
-      const due = occurrencesUpTo(rule, asOf, MAX_OCCURRENCES_PER_RUN, after);
-      if (due.length === MAX_OCCURRENCES_PER_RUN) incomplete.push(rule.id);
+      const due = occurrencesUpTo(rule, asOf, limit, after);
+      if (due.length === limit) incomplete.push(rule.id);
 
       for (const date of due) {
         const id = occurrenceId(rule.id, date);

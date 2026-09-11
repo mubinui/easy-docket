@@ -19,7 +19,8 @@ import {
   anExchangeRate,
 } from '../testing/factories';
 import { SyncTransportError } from './sync-adapter';
-import { SyncService } from './sync.service';
+import { SNAPSHOT_AFTER_OPERATIONS, SyncService } from './sync.service';
+import { snapshotPrefix, stampFromObjectName } from './sync-target';
 
 /**
  * These are integration tests: a real Dexie database, real AES-GCM, the real
@@ -333,6 +334,119 @@ describe('SyncService', () => {
 
       expect((await bob.db.rates.get('EUR:USD:2026-03-14'))?.rate).toBe(1.1);
       expect(alice.adapter.dump()).not.toContain('rates');
+    });
+  });
+
+  describe('snapshots', () => {
+    /** Enough activity to cross the snapshot threshold. */
+    async function fillLedger(device: Device, count: number): Promise<void> {
+      for (let i = 0; i < count; i++) {
+        await device.ledger.put('transactions', aTransaction({ id: `txn-${i}`, payee: `Shop ${i}` }));
+      }
+    }
+
+    it('writes none until enough has accumulated', async () => {
+      await fillLedger(alice, 5);
+      await alice.sync.sync(alice.adapter);
+
+      const snapshots = [...remote.keys()].filter((name) => name.includes('/snapshots/'));
+      expect(snapshots).toHaveLength(0);
+    });
+
+    it('writes one once the threshold is passed', async () => {
+      await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+      await alice.sync.sync(alice.adapter);
+
+      const snapshots = [...remote.keys()].filter((name) => name.includes('/snapshots/'));
+      expect(snapshots).toHaveLength(1);
+      expect(snapshots[0].startsWith(snapshotPrefix(VAULT_ID))).toBe(true);
+    });
+
+    it('does not write another until the threshold is passed again', async () => {
+      await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+      await alice.sync.sync(alice.adapter);
+
+      await alice.ledger.put('transactions', aTransaction({ id: 'one-more' }));
+      await alice.sync.sync(alice.adapter);
+
+      expect([...remote.keys()].filter((name) => name.includes('/snapshots/'))).toHaveLength(1);
+    });
+
+    it('is encrypted like everything else', async () => {
+      await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+      await alice.ledger.put('accounts', anAccount({ name: 'Joint Current Account' }));
+      await alice.sync.sync(alice.adapter);
+
+      // The object name and the envelope header say "snapshot" by design; what
+      // must not appear is anything from the ledger itself.
+      expect(alice.adapter.dump()).not.toContain('Joint Current Account');
+      expect(alice.adapter.dump()).not.toContain('Shop 7');
+    });
+
+    it('lets a new device reach the same ledger without replaying everything', async () => {
+      await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+      await alice.ledger.put('accounts', anAccount());
+      await alice.sync.sync(alice.adapter);
+
+      const bob = await makeDevice('bbbbbbbb', key, remote);
+      const downloadsBefore = bob.adapter.calls.get;
+      await bob.sync.sync(bob.adapter);
+
+      // The same ledger…
+      expect(await bob.db.transactions.count()).toBe(SNAPSHOT_AFTER_OPERATIONS);
+      expect(await bob.db.accounts.count()).toBe(1);
+
+      // …from far fewer objects than the batches Alice wrote.
+      const opObjects = [...remote.keys()].filter((name) => name.includes('/ops/')).length;
+      expect(bob.adapter.calls.get - downloadsBefore).toBeLessThan(opObjects + 1);
+    });
+
+    it('still applies operations written after the snapshot', async () => {
+      await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+      await alice.sync.sync(alice.adapter);
+
+      await alice.ledger.put('transactions', aTransaction({ id: 'later', payee: 'After snapshot' }));
+      await alice.sync.sync(alice.adapter);
+
+      const bob = await makeDevice('bbbbbbbb', key, remote);
+      await bob.sync.sync(bob.adapter);
+
+      expect((await bob.db.transactions.get('later'))?.payee).toBe('After snapshot');
+    });
+
+    it('does not resurrect something deleted after the snapshot', async () => {
+      await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+      await alice.sync.sync(alice.adapter);
+
+      await alice.ledger.remove('transactions', 'txn-0');
+      await alice.sync.sync(alice.adapter);
+
+      const bob = await makeDevice('bbbbbbbb', key, remote);
+      await bob.sync.sync(bob.adapter);
+
+      // The snapshot still lists txn-0; the later tombstone has to win.
+      expect(await bob.db.transactions.get('txn-0')).toBeUndefined();
+    });
+
+    it('is ignored by a device that already has the history', async () => {
+      const bob = await makeDevice('bbbbbbbb', key, remote);
+      await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+      await alice.sync.sync(alice.adapter);
+
+      // Bob syncs the ordinary way first, then again after a snapshot exists.
+      await bob.sync.sync(bob.adapter);
+      const before = bob.adapter.calls.get;
+      await bob.sync.sync(bob.adapter);
+
+      expect(bob.adapter.calls.get).toBe(before);
+    });
+
+    it('names snapshots by clock stamp, so the newest sorts last', async () => {
+      await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+      await alice.sync.sync(alice.adapter);
+
+      const [name] = [...remote.keys()].filter((key) => key.includes('/snapshots/'));
+      expect(stampFromObjectName(name)).not.toBeNull();
     });
   });
 

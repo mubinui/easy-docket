@@ -196,13 +196,21 @@ describe('MaterialiserService', () => {
     });
 
     it('continues where it left off on the next run', async () => {
-      await device.db.recurringRules.put({ ...RULE, unit: 'day', startDate: '2015-01-01' });
+      // A small cap: resumption is the same rule at any size, and writing a
+      // thousand rows to prove it only makes the suite slow.
+      await device.db.recurringRules.put({ ...RULE, unit: 'day', startDate: '2026-01-01' });
 
-      await device.materialiser.run('2026-01-01');
-      const second = await device.materialiser.run('2026-01-01');
+      const first = await device.materialiser.run('2026-12-31', 5);
+      const second = await device.materialiser.run('2026-12-31', 5);
 
-      expect(second.created).toBe(500);
-      expect(await device.db.transactions.count()).toBe(1_000);
+      expect(first.created).toBe(5);
+      expect(second.created).toBe(5);
+      expect(await device.db.transactions.count()).toBe(10);
+
+      // And the second batch is the days after the first, not the same ones.
+      const dates = (await device.db.transactions.toArray()).map((t) => t.date).sort();
+      expect(dates[0]).toBe('2026-01-01');
+      expect(dates[9]).toBe('2026-01-10');
     });
   });
 

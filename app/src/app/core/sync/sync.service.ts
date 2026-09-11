@@ -4,12 +4,19 @@ import { EnvelopeHeader } from '../crypto/envelope';
 import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { VaultService } from '../keys/vault.service';
-import { Operation, OperationBatch } from '../models/oplog';
+import { ENTITY_NAMES, AnyEntity } from '../models/domain';
+import { LedgerSnapshot, Operation, OperationBatch } from '../models/oplog';
 import { LedgerService } from '../repositories/ledger.service';
 import { AdapterFactory, NoSyncTargetError } from './adapter-factory';
 import { SyncAdapter, SyncTransportError } from './sync-adapter';
 import { SyncSettingsService } from './sync-settings.service';
-import { opsObjectName, opsPrefix } from './sync-target';
+import {
+  opsObjectName,
+  opsPrefix,
+  snapshotObjectName,
+  snapshotPrefix,
+  stampFromObjectName,
+} from './sync-target';
 
 /**
  * The sync engine.
@@ -26,6 +33,18 @@ import { opsObjectName, opsPrefix } from './sync-target';
  */
 const MAX_OPS_PER_BATCH = 500;
 const LAST_SYNC_KEY = 'sync.lastSyncAt';
+const LAST_SNAPSHOT_KEY = 'sync.lastSnapshot';
+
+/**
+ * How many operations may accumulate past the newest snapshot before another is
+ * written.
+ *
+ * Snapshots are what stop a device joining a five-year-old vault from replaying
+ * every batch ever written, so they need to be frequent enough to matter and
+ * rare enough not to dominate what is uploaded. A few hundred operations is a
+ * handful of months of ordinary use.
+ */
+export const SNAPSHOT_AFTER_OPERATIONS = 200;
 
 export type SyncState = 'idle' | 'syncing' | 'error';
 
@@ -100,6 +119,7 @@ export class SyncService {
 
       const pulled = await this.pull(adapter, key, vaultId);
       const pushed = await this.push(adapter, key, vaultId);
+      await this.maybeSnapshot(adapter, key, vaultId);
       await adapter.flush?.();
 
       const now = Date.now();
@@ -131,11 +151,37 @@ export class SyncService {
 
   /** Download, decrypt and merge every object this device has not applied yet. */
   private async pull(adapter: SyncAdapter, key: CryptoKey, vaultId: string): Promise<number> {
-    const prefix = opsPrefix(vaultId);
-    const remote = await adapter.list(prefix);
-
     const seen = new Set(await this.db.remoteObjects.toCollection().primaryKeys());
-    const fresh = remote.filter((object) => !seen.has(object.name));
+
+    // A snapshot first, when one would save work. Everything it covers can then
+    // be skipped rather than downloaded and merged operation by operation.
+    const watermark = await this.applySnapshot(adapter, key, vaultId, seen);
+
+    const remote = await adapter.list(opsPrefix(vaultId));
+    const fresh: typeof remote = [];
+    const covered: string[] = [];
+
+    for (const object of remote) {
+      if (seen.has(object.name)) continue;
+
+      // The object is named after the newest operation inside it, so a name at
+      // or below the watermark holds nothing the snapshot has not already said.
+      const stamp = stampFromObjectName(object.name);
+      const isCovered = watermark !== null && stamp !== null && stamp <= watermark;
+
+      if (isCovered) covered.push(object.name);
+      else fresh.push(object);
+    }
+
+    // Recorded as applied, not merely skipped. Otherwise the next sync — which
+    // has no snapshot to apply, because this device now has the history — would
+    // see them as unknown and download every one.
+    if (covered.length > 0) {
+      await this.db.remoteObjects.bulkPut(
+        covered.map((name) => ({ name, appliedAt: Date.now() })),
+      );
+    }
+
     if (fresh.length === 0) return 0;
 
     const ops: Operation[] = [];
@@ -169,6 +215,112 @@ export class SyncService {
       applied.map((name) => ({ name, appliedAt: Date.now() })),
     );
     return count;
+  }
+
+  /**
+   * Apply the newest snapshot, if there is one worth applying.
+   *
+   * Only when this device has applied nothing yet: a device already following
+   * the vault has the history, and re-applying a snapshot would be work for
+   * nothing. Returns the watermark it applied, or null.
+   */
+  private async applySnapshot(
+    adapter: SyncAdapter,
+    key: CryptoKey,
+    vaultId: string,
+    seen: Set<string>,
+  ): Promise<string | null> {
+    if (seen.size > 0) return null;
+
+    const snapshots = await adapter.list(snapshotPrefix(vaultId));
+    if (snapshots.length === 0) return null;
+
+    // Names sort by clock stamp, so the last is the newest.
+    const newest = snapshots[snapshots.length - 1];
+    const bytes = await adapter.get(newest.name);
+    const { header, value } = await this.crypto.openJson<LedgerSnapshot>(key, bytes);
+    if (header.v !== vaultId) return null;
+
+    // Rebuilt as operations carrying each entity's own stamp, so merge applies
+    // exactly the rules it would for live edits — including leaving alone
+    // anything this device deleted after the snapshot was taken.
+    const ops: Operation[] = [];
+    for (const name of ENTITY_NAMES) {
+      for (const row of (value.entities[name] ?? []) as AnyEntity[]) {
+        if (!row || typeof row.id !== 'string' || typeof row.updatedAt !== 'string') continue;
+        ops.push({
+          hlc: row.updatedAt,
+          entity: name,
+          entityId: row.id,
+          op: 'put',
+          value: row,
+          device: value.device,
+        });
+      }
+    }
+
+    this.ledger.observeStamps([value.watermark]);
+    await this.ledger.merge(ops);
+
+    await this.db.remoteObjects.put({ name: newest.name, appliedAt: Date.now() });
+    seen.add(newest.name);
+
+    // Record it as the snapshot this device knows about, so joining a vault
+    // does not immediately write a second snapshot of the history it just
+    // received — every new device would otherwise add one.
+    await this.db.meta.put({ key: LAST_SNAPSHOT_KEY, value: value.watermark });
+
+    return value.watermark;
+  }
+
+  /**
+   * Write a snapshot once enough operations have accumulated past the last one.
+   *
+   * Without this, joining a long-lived vault means replaying every batch ever
+   * written. The operations are left in place: a snapshot makes the download
+   * cheap, and removing what it covers needs a delete the adapters do not have.
+   */
+  private async maybeSnapshot(
+    adapter: SyncAdapter,
+    key: CryptoKey,
+    vaultId: string,
+  ): Promise<void> {
+    const row = await this.db.meta.get(LAST_SNAPSHOT_KEY);
+    const last = (row?.value as string | undefined) ?? '';
+
+    const since = await this.db.oplog.filter((op) => op.hlc > last).count();
+    if (since < SNAPSHOT_AFTER_OPERATIONS) return;
+
+    const operations = await this.db.oplog.orderBy('hlc').toArray();
+    const watermark = operations[operations.length - 1]?.hlc;
+    if (!watermark) return;
+
+    const entities: LedgerSnapshot['entities'] = {};
+    for (const name of ENTITY_NAMES) {
+      entities[name] = (await (
+        this.db[name] as unknown as { toArray(): Promise<AnyEntity[]> }
+      ).toArray()) as AnyEntity[];
+    }
+
+    const device = this.vault.requireDeviceId();
+    const snapshot: LedgerSnapshot = {
+      vaultId,
+      device,
+      watermark,
+      entities,
+      operationCount: operations.length,
+    };
+
+    const name = snapshotObjectName(vaultId, watermark);
+    const sealed = await this.crypto.sealJson(
+      key,
+      { v: vaultId, d: device, h: watermark, t: 'snapshot' },
+      snapshot,
+    );
+
+    await adapter.put(name, sealed);
+    await this.db.remoteObjects.put({ name, appliedAt: Date.now() });
+    await this.db.meta.put({ key: LAST_SNAPSHOT_KEY, value: watermark });
   }
 
   /** Seal and upload local operations the remote has not seen. */

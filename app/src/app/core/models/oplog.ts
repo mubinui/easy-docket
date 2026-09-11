@@ -26,6 +26,25 @@ export interface LocalOperation extends Operation {
   synced: 0 | 1;
 }
 
+/**
+ * A snapshot of the whole ledger at a point in the clock.
+ *
+ * Materially this is a batch of operations reconstructed from current state:
+ * every entity, stamped with the clock value it last changed at. That is what
+ * lets it be applied through the same merge path as anything else — including
+ * the check that a local delete made *after* the snapshot is not undone by it.
+ */
+export interface LedgerSnapshot {
+  vaultId: string;
+  device: string;
+  /** Operations at or before this stamp are represented here. */
+  watermark: string;
+  /** Current state, keyed by entity name. */
+  entities: Partial<Record<EntityName, AnyEntity[]>>;
+  /** How many operations the snapshot stands in for, for diagnostics. */
+  operationCount: number;
+}
+
 /** A batch of operations, which is the unit actually encrypted and uploaded. */
 export interface OperationBatch {
   vaultId: string;
