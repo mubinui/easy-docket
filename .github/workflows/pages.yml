@@ -20,25 +20,37 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: app/package-lock.json
 
-      - uses: actions/configure-pages@v5
+      # Reports where Pages will actually serve the site from. Requires Pages
+      # to be enabled with "GitHub Actions" as the source, otherwise it fails
+      # with "Get Pages site failed".
+      - id: pages
+        uses: actions/configure-pages@v6
 
       - name: Build
         working-directory: app
         env:
-          # Pages serves the site from /<repo>/, so the app's base href and the
-          # service worker scope have to match or nothing resolves.
-          BASE_HREF: /${{ github.event.repository.name }}/
+          # Where Pages will actually serve this site from. A custom domain
+          # serves from the root and reports "", a project site reports
+          # "/easy-docket"; the base href and the service worker scope have to
+          # match whichever it is or no asset resolves.
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
         run: |
+          base_href="${PAGES_BASE_PATH:-/}"
+          case "$base_href" in
+            */) ;;
+            *) base_href="$base_href/" ;;
+          esac
+          echo "Building with base href $base_href"
           npm ci
-          npm run build -- --base-href "$BASE_HREF"
+          npm run build -- --base-href "$base_href"
 
       - name: Add SPA fallback
         working-directory: app
@@ -46,7 +58,7 @@ jobs:
         # 404. Serving index.html as the 404 page hands the route to the router.
         run: cp www/index.html www/404.html
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: app/www
 
@@ -58,4 +70,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
