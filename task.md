@@ -24,13 +24,13 @@ Every task follows the same loop, and none of it is optional:
 | Phase | Scope | State |
 | --- | --- | --- |
 | 1 | Core ledger | ✅ Done |
-| 2 | Budgets | ⬜ Next |
+| 2 | Budgets | 🔄 In progress — 2.1 done |
 | 3 | Reports | ⬜ Planned |
 | 4 | Recurring transactions | ⬜ Planned |
 | 5 | Multi-currency | ⬜ Planned |
 | 6 | Release readiness | ⬜ Planned |
 
-Tests today: **94 client**, **84 Go**.
+Tests today: **107 client**, **84 Go**.
 
 ---
 
@@ -49,28 +49,40 @@ Tests today: **94 client**, **84 Go**.
 
 ---
 
-## Phase 2 — Budgets ⬅ next
+## Phase 2 — Budgets 🔄
 
 Goal: set a spending limit per category per period, and see progress against it
 without opening a report.
 
-### 2.1 Schema and entity
+### 2.1 Schema and entity ✅
 
-- [ ] Add `Budget` to `app/src/app/core/models/domain.ts`:
-      `id, name, categoryIds[], period ('monthly'|'weekly'|'yearly'), amount (Minor),
-      currency, startDate (YYYY-MM-DD), rollover (boolean), archived, createdAt, updatedAt`
-- [ ] Dexie `version(2)` in `docket-db.ts` adding a `budgets` table
-- [ ] Add `'budgets'` to `EntityName` / `EntityMap`
+- [x] `Budget` in `app/src/app/core/models/domain.ts`
+- [x] Dexie `version(2)` in `docket-db.ts` adding a `budgets` table
+- [x] `'budgets'` in `EntityName` / `EntityMap`
 
-**Why it should be cheap:** the operation log, envelope and all three adapters
-are entity-agnostic. If this task needs changes in `sync.service.ts` or any
-adapter, something has leaked and the leak is the real task.
+**Tests** (13 added, 94 → 107)
+- [x] `docket-db.spec.ts` — a v1 database upgrades to v2 with accounts,
+      transactions, meta and oplog rows intact; budgets table present and empty;
+      fresh installs get all seven tables; budget indexes as specified
+- [x] `ledger.service.spec.ts` — put / remove / merge / concurrent-edit
+      resolution for budgets, plus proof that entity identity is
+      `(entity, entityId)` so an account and a budget may share an id
+- [x] `sync.service.spec.ts` — budget replicates between two devices, is
+      encrypted like everything else, batches alongside other entities, and its
+      deletion propagates
 
-**Tests**
-- Opening a v1 database upgrades to v2 with existing rows intact
-- `LedgerService.put/remove/merge` work for budgets with no new code paths
-- A budget written on one simulated device converges on another
-  (extend `sync.service.spec.ts` — it should need only a new fixture)
+**What it found.** The task predicted that needing engine changes would mean a
+leaked abstraction, and there was one. `LedgerService.merge` opened its
+IndexedDB transaction against a hardcoded table list, so `budgets` was outside
+the scope and every merge of one failed with `NotFoundError`. Adding the table
+to the list would have fixed the symptom and left the trap for the next entity,
+so the fix is structural: `ENTITY_NAMES` is now the single source of truth,
+`EntityName` is derived from it, and the merge scope is built by iterating it.
+
+**What it cost.** Three production files: `domain.ts`, `docket-db.ts`,
+`ledger.service.ts`. No change to `sync.service.ts`, the crypto layer, the
+envelope format or any of the three adapters — which is the property this task
+existed to verify.
 
 ### 2.2 Budget calculations
 
@@ -211,6 +223,7 @@ Real, currently unaddressed, and each one has a home above.
 | No rate limiting on the server | A leaked token can be used to exhaust disk | Server hardening, unscheduled — quotas blunt it today |
 | Single currency assumed in UI totals | Dashboard uses the first account's currency | Phase 5 |
 | Category deletion leaves transactions uncategorised | Silent, no warning | Small fix, fold into 2.3 |
+| Deleting a category leaves it referenced in `Budget.categoryIds` | A budget silently stops counting that spend | 2.2 — resolve against live categories and surface stale references |
 | Android build needs JDK 21 | JDK 25 is rejected by this Gradle | Documented in `docs/DEPLOYMENT.md`; revisit on Gradle upgrade |
 
 ---
@@ -224,4 +237,5 @@ Real, currently unaddressed, and each one has a home above.
   needs an explicit decision, not a quiet exception.
 - **Money is integer minor units.** No floats, anywhere.
 - **A new entity should need no change to the sync engine.** If it does, fix the
-  leak rather than special-casing it.
+  leak rather than special-casing it. Task 2.1 found exactly one; `ENTITY_NAMES`
+  now makes "iterate every entity" the only way to write that code.

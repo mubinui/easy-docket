@@ -4,7 +4,7 @@ import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { Operation } from '../models/oplog';
 import { encodeHlc } from '../util/hlc';
-import { anAccount, aTransaction } from '../testing/factories';
+import { aBudget, anAccount, aTransaction } from '../testing/factories';
 import { LedgerService } from './ledger.service';
 
 /**
@@ -112,6 +112,74 @@ describe('LedgerService', () => {
 
       await ledger.markSynced(pending.map((o) => o.hlc));
       expect(await ledger.pendingOperations()).toHaveLength(0);
+    });
+  });
+
+  describe('budgets', () => {
+    /**
+     * Budgets were added in schema v2 and deliberately reuse the generic entity
+     * path. These tests exist to prove that: if any of them needed a change in
+     * `LedgerService`, the abstraction would have leaked.
+     */
+    it('records a budget like any other entity', async () => {
+      const saved = await ledger.put('budgets', aBudget());
+
+      expect(saved.updatedAt).not.toBe('');
+      expect(await db.budgets.get('bud-1')).toEqual(saved);
+      expect(await ledger.allOperations()).toMatchObject([{ entity: 'budgets', op: 'put' }]);
+    });
+
+    it('tombstones a deleted budget', async () => {
+      await ledger.put('budgets', aBudget());
+      await ledger.remove('budgets', 'bud-1');
+
+      expect(await db.budgets.get('bud-1')).toBeUndefined();
+      expect((await ledger.allOperations()).map((o) => o.op)).toEqual(['put', 'delete']);
+    });
+
+    it('merges a budget from another device', async () => {
+      const applied = await ledger.merge([
+        {
+          hlc: stampAt(-1_000),
+          entity: 'budgets',
+          entityId: 'bud-9',
+          op: 'put',
+          value: aBudget({ id: 'bud-9', name: 'Holiday fund', amount: 120_000 }),
+          device: 'bbbbbbbb',
+        },
+      ]);
+
+      expect(applied).toBe(1);
+      expect((await db.budgets.get('bud-9'))?.name).toBe('Holiday fund');
+    });
+
+    it('resolves concurrent budget edits by clock, like every other entity', async () => {
+      const older = {
+        hlc: stampAt(-20_000),
+        entity: 'budgets' as const,
+        entityId: 'bud-9',
+        op: 'put' as const,
+        value: aBudget({ id: 'bud-9', amount: 10_000 }),
+        device: 'bbbbbbbb',
+      };
+      const newer = { ...older, hlc: stampAt(-10_000), value: aBudget({ id: 'bud-9', amount: 99_000 }) };
+
+      await ledger.merge([newer, older]);
+      expect((await db.budgets.get('bud-9'))?.amount).toBe(99_000);
+    });
+
+    it('keeps budget history separate from other entities sharing an id', async () => {
+      // Entity identity is (entity, entityId); an account and a budget may
+      // legitimately carry the same id without colliding in the log.
+      await ledger.put('accounts', anAccount({ id: 'shared-id' }));
+      await ledger.put('budgets', aBudget({ id: 'shared-id' }));
+
+      expect(await db.accounts.get('shared-id')).toBeDefined();
+      expect(await db.budgets.get('shared-id')).toBeDefined();
+
+      await ledger.remove('budgets', 'shared-id');
+      expect(await db.accounts.get('shared-id')).toBeDefined();
+      expect(await db.budgets.get('shared-id')).toBeUndefined();
     });
   });
 

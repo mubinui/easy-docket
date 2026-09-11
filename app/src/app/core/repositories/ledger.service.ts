@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Table } from 'dexie';
 import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
-import { AnyEntity, EntityMap, EntityName } from '../models/domain';
+import { ENTITY_NAMES, AnyEntity, EntityMap, EntityName } from '../models/domain';
 import { LocalOperation, Operation } from '../models/oplog';
 import { HlcState, HybridLogicalClock, compareHlc } from '../util/hlc';
 
@@ -102,13 +102,12 @@ export class LedgerService {
     const ordered = [...ops].sort((a, b) => compareHlc(a.hlc, b.hlc));
     let applied = 0;
 
+    // Every entity table is in scope, derived from ENTITY_NAMES rather than
+    // listed by hand: a batch may touch any of them, and a table left out of
+    // the scope fails at runtime rather than at compile time.
     await this.db.transaction(
       'rw',
-      this.db.accounts,
-      this.db.categories,
-      this.db.transactions,
-      this.db.oplog,
-      this.db.meta,
+      [...ENTITY_NAMES.map((entity) => this.table(entity)), this.db.oplog, this.db.meta],
       async () => {
         for (const op of ordered) {
           const latest = await this.latestStampFor(op.entity, op.entityId);

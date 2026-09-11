@@ -1,4 +1,4 @@
-import { Account, Category, Transaction } from '../models/domain';
+import { Account, Budget, Category, Transaction } from '../models/domain';
 
 /**
  * Builders for test fixtures. Every field has a sensible default so a test only
@@ -49,6 +49,23 @@ export function aTransaction(overrides: Partial<Transaction> = {}): Transaction 
     note: '',
     tags: [],
     cleared: true,
+    createdAt: 1_700_000_000_000,
+    updatedAt: '',
+    ...overrides,
+  };
+}
+
+export function aBudget(overrides: Partial<Budget> = {}): Budget {
+  return {
+    id: 'bud-1',
+    name: 'Everyday spending',
+    categoryIds: ['cat-1'],
+    period: 'monthly',
+    amount: 50_000,
+    currency: 'USD',
+    startDate: '2026-01-01',
+    rollover: false,
+    archived: false,
     createdAt: 1_700_000_000_000,
     updatedAt: '',
     ...overrides,

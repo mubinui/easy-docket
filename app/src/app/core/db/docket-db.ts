@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { Account, Category, Transaction } from '../models/domain';
+import { Account, Budget, Category, Transaction } from '../models/domain';
 import { LocalOperation } from '../models/oplog';
 
 /**
@@ -10,8 +10,8 @@ import { LocalOperation } from '../models/oplog';
  *
  * Two kinds of table live here:
  *
- *  - **Materialised entities** (`accounts`, `categories`, `transactions`) — the
- *    current state, indexed for the queries the UI actually makes.
+ *  - **Materialised entities** (`accounts`, `categories`, `transactions`,
+ *    `budgets`) — the current state, indexed for the queries the UI makes.
  *  - **Replication bookkeeping** (`oplog`, `remoteObjects`, `meta`) — the
  *    append-only operation log plus a record of which remote objects have
  *    already been merged, so a repeated pull is cheap and idempotent.
@@ -34,6 +34,7 @@ export class DocketDb extends Dexie {
   accounts!: Table<Account, string>;
   categories!: Table<Category, string>;
   transactions!: Table<Transaction, string>;
+  budgets!: Table<Budget, string>;
   oplog!: Table<LocalOperation, string>;
   remoteObjects!: Table<RemoteObjectRecord, string>;
   meta!: Table<MetaRecord, string>;
@@ -52,6 +53,17 @@ export class DocketDb extends Dexie {
       oplog: 'hlc, synced, [entity+entityId]',
       remoteObjects: 'name',
       meta: 'key',
+    });
+
+    // v2 — budgets.
+    //
+    // Only the new table is declared: Dexie carries every unchanged store
+    // forward, and an upgrade with no `.upgrade()` callback needs no data
+    // migration because existing rows are untouched. Budgets replicate through
+    // the same operation log as everything else, so neither the sync engine nor
+    // any adapter changes for this.
+    this.version(2).stores({
+      budgets: 'id, period, archived',
     });
   }
 }

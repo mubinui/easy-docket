@@ -11,7 +11,7 @@ import { LedgerService } from '../repositories/ledger.service';
 import { SyncSettingsService } from './sync-settings.service';
 import { fakeVault } from '../testing/fake-vault';
 import { InMemoryAdapter } from '../testing/in-memory-adapter';
-import { aTransaction, anAccount } from '../testing/factories';
+import { aBudget, aTransaction, anAccount } from '../testing/factories';
 import { SyncTransportError } from './sync-adapter';
 import { SyncService } from './sync.service';
 
@@ -235,6 +235,65 @@ describe('SyncService', () => {
       const again = await alice.sync.sync(alice.adapter);
       expect(again.pulled).toBe(0);
       expect(await alice.db.transactions.count()).toBe(1);
+    });
+  });
+
+  describe('budgets', () => {
+    /**
+     * Budgets are the first entity added after the sync engine was written.
+     * These tests are the check that adding one costs nothing: no adapter, no
+     * envelope and no engine code knows budgets exist.
+     */
+    it('replicates a budget to another device', async () => {
+      const bob = await makeDevice('bbbbbbbb', key, remote);
+
+      await alice.ledger.put('budgets', aBudget({ name: 'Groceries cap', amount: 40_000 }));
+      await alice.sync.sync(alice.adapter);
+      await bob.sync.sync(bob.adapter);
+
+      expect(await bob.db.budgets.get('bud-1')).toMatchObject({
+        name: 'Groceries cap',
+        amount: 40_000,
+      });
+    });
+
+    it('encrypts budgets like everything else', async () => {
+      await alice.ledger.put(
+        'budgets',
+        aBudget({ name: 'Divorce lawyer fund', amount: 250_000 }),
+      );
+      await alice.sync.sync(alice.adapter);
+
+      const dump = alice.adapter.dump();
+      expect(dump).not.toContain('Divorce lawyer fund');
+      expect(dump).not.toContain('250000');
+      expect(dump).not.toContain('budgets');
+    });
+
+    it('carries budgets and transactions in one batch', async () => {
+      await alice.ledger.put('accounts', anAccount());
+      await alice.ledger.put('budgets', aBudget());
+      await alice.ledger.put('transactions', aTransaction());
+
+      const status = await alice.sync.sync(alice.adapter);
+
+      expect(status.pushed).toBe(3);
+      expect(remote.size).toBe(1);
+    });
+
+    it('propagates a budget deletion', async () => {
+      const bob = await makeDevice('bbbbbbbb', key, remote);
+
+      await alice.ledger.put('budgets', aBudget());
+      await alice.sync.sync(alice.adapter);
+      await bob.sync.sync(bob.adapter);
+      expect(await bob.db.budgets.count()).toBe(1);
+
+      await alice.ledger.remove('budgets', 'bud-1');
+      await alice.sync.sync(alice.adapter);
+      await bob.sync.sync(bob.adapter);
+
+      expect(await bob.db.budgets.count()).toBe(0);
     });
   });
 
