@@ -1,0 +1,16 @@
+# Browsers Easy Docket supports.
+#
+# Ionic's default list reaches further back than Angular 22 does, which makes
+# the build warn on every run. These are Angular's own supported baselines,
+# which also happen to be the point at which the platform features this app
+# depends on — WebCrypto on a secure origin, IndexedDB with compound indexes,
+# CSS `color-scheme` — are reliably present.
+#
+# The Android WebView is covered by the Chrome query: Capacitor requires a
+# System WebView well above this floor.
+
+Chrome >=120
+Firefox >=128
+Edge >=120
+Safari >=17
+iOS >=17

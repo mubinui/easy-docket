@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+app/www/
+app/dist/
+app/out-tsc/
+app/.angular/
+server/bin/
+server/dist/
+server/coverage.out
+
+# Capacitor / Android build artefacts. The `android/` project itself is
+# committed so that the Play Store configuration is reviewable, but nothing
+# Gradle generates belongs in version control.
+app/android/build/
+app/android/app/build/
+app/android/.gradle/
+app/android/local.properties
+app/android/capacitor-cordova-android-plugins/
+app/android/app/src/main/assets/public/
+app/android/app/src/main/assets/capacitor.config.json
+app/android/app/src/main/assets/capacitor.plugins.json
+app/android/app/release/
+
+# Signing material — never commit these.
+*.keystore
+*.jks
+keystore.properties
+
+# Server runtime state
+server/.data/
+server/.tokens
+server/tokens
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
