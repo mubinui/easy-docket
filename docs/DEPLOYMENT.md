@@ -194,6 +194,10 @@ In the app: **Settings → Sync → Destination**, then "Test connection" before
 saving. The probe authenticates without writing, so a typo is caught there
 rather than as a silent background failure later.
 
+Both the Git and S3 adapters are exercised against real remotes in CI — Git
+through `git http-backend`, S3 through MinIO — so the protocol paths are
+checked, not assumed.
+
 For Git in the browser, a CORS proxy is required — most Git hosts send no CORS
 headers. The Android app does not need one. The proxy only ever relays
 encrypted data, but it does see the repository URL and token, so run your own

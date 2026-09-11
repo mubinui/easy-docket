@@ -44,6 +44,7 @@
     "@capgo/capacitor-native-biometric": "^8.6.7",
     "@ionic/angular": "^9.0.0",
     "@isomorphic-git/lightning-fs": "^4.7.0",
+    "buffer": "^6.0.3",
     "capacitor-secure-storage-plugin": "^0.11.0",
     "dexie": "^4.4.6",
     "ionicons": "^8.1.0",

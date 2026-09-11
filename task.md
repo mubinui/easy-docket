@@ -30,7 +30,7 @@ Every task follows the same loop, and none of it is optional:
 | 5 | Multi-currency | ✅ Done |
 | 6 | Release readiness | 🔄 6.1–6.3, 6.5 done |
 
-Tests today: **552 client unit**, **57 end-to-end**, **95 Go**.
+Tests today: **552 client unit**, **59 end-to-end**, **95 Go**.
 
 ---
 
@@ -738,8 +738,9 @@ Real, currently unaddressed, and each one has a home above.
 | ~~A long-lived vault re-downloads its whole history on a new device~~ | — | ✅ Closed in 6.3 (snapshots) |
 | ~~Objects a snapshot covers are never removed~~ | — | ✅ Closed: `remove` on the adapter contract, `DELETE /v1/objects` on the server, and the S3 and Git equivalents |
 | `MaterialiserService.run` writes up to 500 rows one at a time | Slow enough that a test had to cap it; a first launch catching up years would feel it | Open — batch the writes if it ever matters |
-| Git adapter has no integration test | Only unit-level coverage; a real push is unproven | Still open — 6.5 covers the server adapter end to end, but a Git remote needs a local git-http-backend in CI |
-| S3 adapter has no integration test | Same; a MinIO container in CI would close it | Unscheduled |
+| ~~Git adapter has no integration test~~ | — | ✅ Closed: `git http-backend` in the e2e suite. **It found two bugs that made Git sync entirely non-functional** — see below |
+| ~~S3 adapter has no integration test~~ | — | ✅ Closed: MinIO in Docker. Passed first time |
+| `remove` is unproven against S3 and Git | Pruning is covered against the Go server and by unit tests, but the S3 and Git delete paths have not run against a real remote | Open. Needs a snapshot to trigger, which needs 200 operations — worth a seeded fixture rather than driving the UI |
 | No rate limiting on the server | A leaked token can be used to exhaust disk | Server hardening, unscheduled — quotas blunt it today |
 | Single currency assumed in UI totals | Dashboard uses the first account's currency | Phase 5 |
 | Category deletion leaves transactions uncategorised | Silent, no warning | Small fix, fold into 2.3 |
@@ -749,6 +750,32 @@ Real, currently unaddressed, and each one has a home above.
 | Android build needs JDK 21 | JDK 25 is rejected by this Gradle | Documented in `docs/DEPLOYMENT.md`; revisit on Gradle upgrade |
 
 ---
+
+## Adapter integration tests
+
+`e2e/git-sync.spec.ts` and `e2e/s3-sync.spec.ts` drive the app against a real
+Git remote and a real S3 store, and run as their own CI job.
+
+Git uses `git http-backend` — the CGI program every Git host runs — wrapped in a
+small Node server (`e2e/servers/git-http.mjs`) that adds the CORS headers a
+public host would not. S3 uses MinIO in a container, which speaks the same API
+as AWS, R2 and B2. Both skip cleanly where their dependency is missing.
+
+**This closed a gap that was hiding two complete failures of the Git adapter.**
+Both were invisible to unit tests, to the type checker and to the linter,
+because a stub adapter agrees with whatever the code does:
+
+1. **`Missing Buffer dependency`.** `isomorphic-git` is written against Node's
+   `Buffer`, and Angular does not polyfill Node globals — so the adapter threw
+   on its first real request. Git sync had never worked in a browser at all.
+2. **`Could not find main`.** `clone` fails against an empty repository, which
+   is exactly what someone creates when they make a repo for this and point the
+   app at it. The adapter now asks for the remote's refs first and initialises a
+   local history when there are none, letting the first push create the branch.
+
+The S3 adapter passed on the first run, which is worth recording too: the value
+of the exercise was not that everything was broken, but that nothing had been
+checked.
 
 ## Testing notes
 
@@ -766,6 +793,9 @@ Things learned the hard way, worth not relearning:
 - **Look at the thing.** Colour can be validated by script and geometry by
   assertion; neither can see a stranded label or a chart that reads as broken.
   Both chart tasks found a real defect that way and only that way.
+- **A stub agrees with whatever you wrote.** The Git adapter was unit-tested,
+  typed and linted, and had never once worked. Anything that speaks a protocol
+  needs to speak it to something that did not come from this repository.
 
 ## Ground rules carried forward
 

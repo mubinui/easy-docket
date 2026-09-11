@@ -1,3 +1,7 @@
+// Side-effect import, and it must come first: isomorphic-git reaches for a
+// Buffer global as soon as it does anything.
+import './buffer-polyfill';
+
 import FS from '@isomorphic-git/lightning-fs';
 import * as git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
@@ -126,8 +130,9 @@ export class GitAdapter implements SyncAdapter {
   /** Fetch and fast-forward, so a listing reflects what other devices pushed. */
   private async sync(): Promise<void> {
     await this.ensureClone();
-    await this.run(() =>
-      git.fastForward({
+
+    try {
+      await git.fastForward({
         fs: this.fs,
         http,
         dir: REPO_DIR,
@@ -135,8 +140,14 @@ export class GitAdapter implements SyncAdapter {
         singleBranch: true,
         corsProxy: this.target.corsProxy || undefined,
         onAuth: () => this.auth(),
-      }),
-    );
+      });
+    } catch (cause) {
+      // A branch that does not exist upstream yet is the ordinary state of a
+      // repository created for this and not yet pushed to. There is nothing to
+      // fast-forward to, and the first push will create it.
+      if (isMissingRef(cause)) return;
+      throw this.transportError(cause);
+    }
   }
 
   /**
@@ -158,22 +169,48 @@ export class GitAdapter implements SyncAdapter {
     if (alreadyCloned) return;
 
     await this.mkdirp(REPO_DIR);
-    await this.run(() =>
-      git.clone({
-        fs: this.fs,
+
+    // An empty repository is the normal state of one someone just created for
+    // this, and there is nothing to clone from it — `clone` fails with "Could
+    // not find <branch>". Ask first, then either clone or start a history.
+    const refs = await this.run(() =>
+      git.getRemoteInfo({
         http,
-        dir: REPO_DIR,
         url: this.target.repoUrl,
-        ref: this.target.branch,
-        singleBranch: true,
-        // The vault is append-only, so old history is never read. A shallow
-        // clone keeps a multi-year vault from costing a full download on a new
-        // device, but keeps enough for a valid push.
-        depth: 1,
         corsProxy: this.target.corsProxy || undefined,
         onAuth: () => this.auth(),
       }),
     );
+
+    if (refs.refs?.heads && Object.keys(refs.refs.heads).length > 0) {
+      await this.run(() =>
+        git.clone({
+          fs: this.fs,
+          http,
+          dir: REPO_DIR,
+          url: this.target.repoUrl,
+          ref: this.target.branch,
+          singleBranch: true,
+          // The vault is append-only, so old history is never read. A shallow
+          // clone keeps a multi-year vault from costing a full download on a
+          // new device, while keeping enough for a valid push.
+          depth: 1,
+          corsProxy: this.target.corsProxy || undefined,
+          onAuth: () => this.auth(),
+        }),
+      );
+      return;
+    }
+
+    await this.run(async () => {
+      await git.init({ fs: this.fs, dir: REPO_DIR, defaultBranch: this.target.branch });
+      await git.addRemote({
+        fs: this.fs,
+        dir: REPO_DIR,
+        remote: 'origin',
+        url: this.target.repoUrl,
+      });
+    });
   }
 
   private auth(): { username: string; password: string } {
@@ -183,7 +220,7 @@ export class GitAdapter implements SyncAdapter {
     };
   }
 
-  /** LightningFS has no recursive mkdir. */
+/** LightningFS has no recursive mkdir. */
   private async mkdirp(path: string): Promise<void> {
     const segments = path.split('/').filter(Boolean);
     let current = '';
@@ -201,11 +238,26 @@ export class GitAdapter implements SyncAdapter {
     try {
       return await operation();
     } catch (cause) {
-      const error = cause as Error & { code?: string; data?: { statusCode?: number } };
-      const status = error.data?.statusCode;
-      const retryable =
-        status === undefined || status >= 500 || status === 429 || error.code === 'HttpError';
-      throw new SyncTransportError(`Git operation failed: ${error.message}`, retryable, cause);
+      throw this.transportError(cause);
     }
   }
+
+  private transportError(cause: unknown): SyncTransportError {
+    const error = cause as Error & { code?: string; data?: { statusCode?: number } };
+    const status = error.data?.statusCode;
+    const retryable =
+      status === undefined || status >= 500 || status === 429 || error.code === 'HttpError';
+
+    return new SyncTransportError(`Git operation failed: ${error.message}`, retryable, cause);
+  }
+}
+
+/** Whether a failure is "that reference does not exist upstream yet". */
+function isMissingRef(cause: unknown): boolean {
+  const error = cause as { code?: string; message?: string };
+  return (
+    error.code === 'NotFoundError' ||
+    error.code === 'ResolveRefError' ||
+    /could not find/i.test(error.message ?? '')
+  );
 }
