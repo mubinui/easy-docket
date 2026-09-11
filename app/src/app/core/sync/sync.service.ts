@@ -59,6 +59,12 @@ export interface SyncStatus {
   pushed: number;
 }
 
+/** Whether an object named after a clock stamp falls at or below a watermark. */
+function coveredBy(name: string, watermark: string): boolean {
+  const stamp = stampFromObjectName(name);
+  return stamp !== null && stamp <= watermark;
+}
+
 const INITIAL_STATUS: SyncStatus = {
   state: 'idle',
   lastSyncAt: null,
@@ -166,10 +172,7 @@ export class SyncService {
 
       // The object is named after the newest operation inside it, so a name at
       // or below the watermark holds nothing the snapshot has not already said.
-      const stamp = stampFromObjectName(object.name);
-      const isCovered = watermark !== null && stamp !== null && stamp <= watermark;
-
-      if (isCovered) covered.push(object.name);
+      if (watermark !== null && coveredBy(object.name, watermark)) covered.push(object.name);
       else fresh.push(object);
     }
 
@@ -218,11 +221,15 @@ export class SyncService {
   }
 
   /**
-   * Apply the newest snapshot, if there is one worth applying.
+   * Apply the newest snapshot this device has not applied yet.
    *
-   * Only when this device has applied nothing yet: a device already following
-   * the vault has the history, and re-applying a snapshot would be work for
-   * nothing. Returns the watermark it applied, or null.
+   * Every unapplied snapshot is applied, not only the first — which matters
+   * because operations a snapshot covers are pruned from the destination. A
+   * device that was away while a snapshot was written and its operations
+   * removed would otherwise never learn what happened in between: the
+   * operations are gone, and the snapshot is the only remaining record. Merge
+   * is idempotent, so applying one that turns out to be redundant costs a
+   * download and changes nothing.
    */
   private async applySnapshot(
     adapter: SyncAdapter,
@@ -230,13 +237,12 @@ export class SyncService {
     vaultId: string,
     seen: Set<string>,
   ): Promise<string | null> {
-    if (seen.size > 0) return null;
-
     const snapshots = await adapter.list(snapshotPrefix(vaultId));
     if (snapshots.length === 0) return null;
 
     // Names sort by clock stamp, so the last is the newest.
     const newest = snapshots[snapshots.length - 1];
+    if (seen.has(newest.name)) return null;
     const bytes = await adapter.get(newest.name);
     const { header, value } = await this.crypto.openJson<LedgerSnapshot>(key, bytes);
     if (header.v !== vaultId) return null;
@@ -321,6 +327,41 @@ export class SyncService {
     await adapter.put(name, sealed);
     await this.db.remoteObjects.put({ name, appliedAt: Date.now() });
     await this.db.meta.put({ key: LAST_SNAPSHOT_KEY, value: watermark });
+
+    await this.prune(adapter, vaultId, watermark);
+  }
+
+  /**
+   * Remove what the new snapshot has made redundant.
+   *
+   * Safe because every device applies any snapshot it has not seen: whatever
+   * these objects said, the snapshot says too. Failures are swallowed — the
+   * next snapshot will cover the same objects and try again, and a destination
+   * that is full of superseded batches is untidy, not broken.
+   */
+  private async prune(adapter: SyncAdapter, vaultId: string, watermark: string): Promise<void> {
+    try {
+      const [ops, snapshots] = await Promise.all([
+        adapter.list(opsPrefix(vaultId)),
+        adapter.list(snapshotPrefix(vaultId)),
+      ]);
+
+      const superseded = [
+        ...ops.filter((object) => coveredBy(object.name, watermark)),
+        // Older snapshots, but never the one just written.
+        ...snapshots.filter((object) => {
+          const stamp = stampFromObjectName(object.name);
+          return stamp !== null && stamp < watermark;
+        }),
+      ];
+
+      for (const object of superseded) {
+        await adapter.remove(object.name);
+        await this.db.remoteObjects.delete(object.name);
+      }
+    } catch {
+      // Pruning is housekeeping, never the point of a sync.
+    }
   }
 
   /** Seal and upload local operations the remote has not seen. */

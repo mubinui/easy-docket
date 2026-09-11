@@ -219,6 +219,52 @@ func TestPutRejectsBadInput(t *testing.T) {
 	})
 }
 
+func TestDelete(t *testing.T) {
+	s := newServer(t)
+	path := "/v1/objects/" + objectName(0)
+	do(t, s, http.MethodPut, path, aliceToken, []byte("payload"))
+
+	t.Run("removes the object", func(t *testing.T) {
+		if w := do(t, s, http.MethodDelete, path, aliceToken, nil); w.Code != http.StatusNoContent {
+			t.Fatalf("status = %d, want 204", w.Code)
+		}
+		if w := do(t, s, http.MethodGet, path, aliceToken, nil); w.Code != http.StatusNotFound {
+			t.Errorf("object survived: status = %d", w.Code)
+		}
+	})
+
+	t.Run("succeeds when it was already gone", func(t *testing.T) {
+		if w := do(t, s, http.MethodDelete, path, aliceToken, nil); w.Code != http.StatusNoContent {
+			t.Errorf("status = %d, want 204", w.Code)
+		}
+	})
+
+	t.Run("needs a token", func(t *testing.T) {
+		if w := do(t, s, http.MethodDelete, path, "", nil); w.Code != http.StatusUnauthorized {
+			t.Errorf("status = %d, want 401", w.Code)
+		}
+	})
+
+	t.Run("cannot reach another account", func(t *testing.T) {
+		do(t, s, http.MethodPut, path, aliceToken, []byte("alice's"))
+
+		if w := do(t, s, http.MethodDelete, path, bobToken, nil); w.Code != http.StatusNoContent {
+			t.Fatalf("status = %d, want 204", w.Code)
+		}
+		// Bob deleted nothing, because he has nothing under that name.
+		if w := do(t, s, http.MethodGet, path, aliceToken, nil); w.Code != http.StatusOK {
+			t.Errorf("alice's object was removed by bob: status = %d", w.Code)
+		}
+	})
+
+	t.Run("rejects a name outside the layout", func(t *testing.T) {
+		w := do(t, s, http.MethodDelete, "/v1/objects/etc/passwd", aliceToken, nil)
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400", w.Code)
+		}
+	})
+}
+
 func TestListing(t *testing.T) {
 	s := newServer(t)
 	for i := range 3 {

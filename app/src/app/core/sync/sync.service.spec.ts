@@ -383,7 +383,7 @@ describe('SyncService', () => {
       expect(alice.adapter.dump()).not.toContain('Shop 7');
     });
 
-    it('lets a new device reach the same ledger without replaying everything', async () => {
+    it('lets a new device reach the same ledger from one object', async () => {
       await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
       await alice.ledger.put('accounts', anAccount());
       await alice.sync.sync(alice.adapter);
@@ -396,9 +396,8 @@ describe('SyncService', () => {
       expect(await bob.db.transactions.count()).toBe(SNAPSHOT_AFTER_OPERATIONS);
       expect(await bob.db.accounts.count()).toBe(1);
 
-      // …from far fewer objects than the batches Alice wrote.
-      const opObjects = [...remote.keys()].filter((name) => name.includes('/ops/')).length;
-      expect(bob.adapter.calls.get - downloadsBefore).toBeLessThan(opObjects + 1);
+      // …from the snapshot alone, rather than every batch Alice ever wrote.
+      expect(bob.adapter.calls.get - downloadsBefore).toBe(1);
     });
 
     it('still applies operations written after the snapshot', async () => {
@@ -428,17 +427,89 @@ describe('SyncService', () => {
       expect(await bob.db.transactions.get('txn-0')).toBeUndefined();
     });
 
-    it('is ignored by a device that already has the history', async () => {
-      const bob = await makeDevice('bbbbbbbb', key, remote);
+    it('is downloaded once per device, not on every sync', async () => {
       await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
       await alice.sync.sync(alice.adapter);
 
-      // Bob syncs the ordinary way first, then again after a snapshot exists.
+      const bob = await makeDevice('bbbbbbbb', key, remote);
       await bob.sync.sync(bob.adapter);
       const before = bob.adapter.calls.get;
-      await bob.sync.sync(bob.adapter);
 
+      await bob.sync.sync(bob.adapter);
       expect(bob.adapter.calls.get).toBe(before);
+    });
+
+    describe('pruning', () => {
+      it('removes the operations the snapshot covers', async () => {
+        await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+        await alice.sync.sync(alice.adapter);
+
+        expect([...remote.keys()].filter((name) => name.includes('/ops/'))).toHaveLength(0);
+        expect([...remote.keys()].filter((name) => name.includes('/snapshots/'))).toHaveLength(1);
+      });
+
+      it('keeps operations written after the snapshot', async () => {
+        await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+        await alice.sync.sync(alice.adapter);
+
+        await alice.ledger.put('transactions', aTransaction({ id: 'later' }));
+        await alice.sync.sync(alice.adapter);
+
+        expect([...remote.keys()].filter((name) => name.includes('/ops/'))).toHaveLength(1);
+      });
+
+      it('keeps only the newest snapshot', async () => {
+        await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+        await alice.sync.sync(alice.adapter);
+        await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS * 2);
+        await alice.sync.sync(alice.adapter);
+
+        expect([...remote.keys()].filter((name) => name.includes('/snapshots/'))).toHaveLength(1);
+      });
+
+      it('lets a device that was away catch up on what was pruned', async () => {
+        // The case pruning could have broken. Bob syncs early, misses the next
+        // two hundred operations, and by the time he returns those batches are
+        // gone — the snapshot is the only record of them left.
+        const bob = await makeDevice('bbbbbbbb', key, remote);
+        await alice.ledger.put('accounts', anAccount({ name: 'Everyday' }));
+        await alice.sync.sync(alice.adapter);
+        await bob.sync.sync(bob.adapter);
+        expect(await bob.db.accounts.count()).toBe(1);
+
+        await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+        await alice.sync.sync(alice.adapter);
+        expect([...remote.keys()].filter((name) => name.includes('/ops/'))).toHaveLength(0);
+
+        await bob.sync.sync(bob.adapter);
+        expect(await bob.db.transactions.count()).toBe(SNAPSHOT_AFTER_OPERATIONS);
+      });
+
+      it('does not lose a local edit made while away', async () => {
+        const bob = await makeDevice('bbbbbbbb', key, remote);
+        await bob.ledger.put('accounts', anAccount({ id: 'bob-acc', name: "Bob's" }));
+
+        await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+        await alice.sync.sync(alice.adapter);
+
+        await bob.sync.sync(bob.adapter);
+        await alice.sync.sync(alice.adapter);
+
+        // Bob's own work survived the snapshot, and reached Alice.
+        expect(await bob.db.accounts.get('bob-acc')).toBeDefined();
+        expect(await alice.db.accounts.get('bob-acc')).toBeDefined();
+      });
+
+      it('does not fail a sync when the destination refuses a delete', async () => {
+        // Housekeeping is never the point of a sync.
+        await fillLedger(alice, SNAPSHOT_AFTER_OPERATIONS);
+        alice.adapter.failOnRemove = true;
+
+        const status = await alice.sync.sync(alice.adapter);
+
+        expect(status.state).toBe('idle');
+        expect([...remote.keys()].filter((name) => name.includes('/snapshots/'))).toHaveLength(1);
+      });
     });
 
     it('names snapshots by clock stamp, so the newest sorts last', async () => {

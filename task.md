@@ -30,7 +30,7 @@ Every task follows the same loop, and none of it is optional:
 | 5 | Multi-currency | ✅ Done |
 | 6 | Release readiness | 🔄 6.1–6.3, 6.5 done |
 
-Tests today: **545 client unit**, **57 end-to-end**, **84 Go**.
+Tests today: **552 client unit**, **57 end-to-end**, **95 Go**.
 
 ---
 
@@ -666,12 +666,36 @@ the vault's reporting currency. Both corrected.
   post-snapshot delete not resurrected, and a device that already has the history
   ignoring it.
 
+  **Pruning followed** (see below), which required one correctness change: a
+  device now applies *any* snapshot it has not seen, not only its first. A
+  device that was away while a snapshot was written and its operations pruned
+  would otherwise never learn what happened in between — the operations are
+  gone, and the snapshot is the only remaining record. There is a test for
+  exactly that sequence.
+
   **Two real bugs found while testing.** Objects skipped because a snapshot
   covered them were not recorded as applied, so the *next* sync — which has no
   snapshot to apply, having just gained the history — saw them as unknown and
   downloaded every one. And a device that had just applied a snapshot
   immediately wrote its own, meaning every new device added a duplicate;
   applying one now records it as the snapshot this device knows about.
+- [x] **Snapshot pruning** ✅ — `remove` added to the adapter contract, with
+      `DELETE /v1/objects/{name}` on the Go server and the S3 and Git
+      equivalents. Once a snapshot is written, the operations it covers and any
+      older snapshot are deleted, so destination storage tracks the size of the
+      ledger rather than the number of syncs.
+
+  **The safety argument.** Deleting history is only sound because every device
+  applies any snapshot it has not seen; whatever the pruned objects said, the
+  snapshot says too. The test that matters is the one where a device syncs
+  early, misses two hundred operations, and returns to find those batches gone —
+  it still ends up with the same ledger.
+
+  **Deletes are idempotent and never fail a sync.** A retried prune must not
+  fail on its own earlier progress, and a destination that refuses deletes
+  should leave a working but untidy vault rather than a broken one. Both are
+  tested, the latter with an adapter that refuses every delete.
+
 - [ ] **6.4 Play Store signing** — `signingConfigs` wired to
       `keystore.properties`, release workflow producing a signed `.aab`.
 - [x] **6.5 E2E suite in CI** ✅ — Playwright, 26 tests, running the real Go
@@ -712,7 +736,7 @@ Real, currently unaddressed, and each one has a home above.
 | Gap | Impact | Where it gets fixed |
 | --- | --- | --- |
 | ~~A long-lived vault re-downloads its whole history on a new device~~ | — | ✅ Closed in 6.3 (snapshots) |
-| Objects a snapshot covers are never removed from the destination | Storage grows forever, though downloads no longer do | Open. Needs a `delete` on the adapter contract, plus a DELETE endpoint on the server and the S3/Git equivalents |
+| ~~Objects a snapshot covers are never removed~~ | — | ✅ Closed: `remove` on the adapter contract, `DELETE /v1/objects` on the server, and the S3 and Git equivalents |
 | `MaterialiserService.run` writes up to 500 rows one at a time | Slow enough that a test had to cap it; a first launch catching up years would feel it | Open — batch the writes if it ever matters |
 | Git adapter has no integration test | Only unit-level coverage; a real push is unproven | Still open — 6.5 covers the server adapter end to end, but a Git remote needs a local git-http-backend in CI |
 | S3 adapter has no integration test | Same; a MinIO container in CI would close it | Unscheduled |

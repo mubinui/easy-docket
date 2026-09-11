@@ -89,8 +89,10 @@ func TestCORSPreflight(t *testing.T) {
 		if w.Code != http.StatusNoContent {
 			t.Fatalf("status = %d, want 204", w.Code)
 		}
-		if got := w.Header().Get("Access-Control-Allow-Methods"); !strings.Contains(got, "PUT") {
-			t.Errorf("Allow-Methods = %q", got)
+		for _, method := range []string{"GET", "PUT", "DELETE"} {
+			if got := w.Header().Get("Access-Control-Allow-Methods"); !strings.Contains(got, method) {
+				t.Errorf("Allow-Methods missing %s: %q", method, got)
+			}
 		}
 		for _, header := range []string{"Authorization", "Content-Type", "If-None-Match"} {
 			if !strings.Contains(w.Header().Get("Access-Control-Allow-Headers"), header) {

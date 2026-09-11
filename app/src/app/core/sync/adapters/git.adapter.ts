@@ -67,6 +67,22 @@ export class GitAdapter implements SyncAdapter {
     this.staged.add(name);
   }
 
+  async remove(name: string): Promise<void> {
+    await this.ensureClone();
+    const path = `${REPO_DIR}/${name}`;
+
+    try {
+      await this.fs.promises.unlink(path);
+    } catch (error) {
+      // Already gone: nothing to stage, and nothing to complain about.
+      if ((error as { code?: string }).code === 'ENOENT') return;
+      throw error;
+    }
+
+    await this.run(() => git.remove({ fs: this.fs, dir: REPO_DIR, filepath: name }));
+    this.staged.add(name);
+  }
+
   /** Commit everything staged since the last flush and push it upstream. */
   async flush(): Promise<void> {
     if (this.staged.size === 0) return;

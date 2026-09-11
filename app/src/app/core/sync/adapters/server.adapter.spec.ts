@@ -76,6 +76,14 @@ describe('ServerAdapter', () => {
     expect(objects.map((o) => o.name)).toEqual(['a', 'b']);
   });
 
+  it('deletes an object by name', async () => {
+    const { impl, calls } = stubFetch(new Response(null, { status: 204 }));
+    await new ServerAdapter(target, impl).remove(OBJECT);
+
+    expect(calls[0].init.method).toBe('DELETE');
+    expect(calls[0].url).toBe(`https://docket.example.com/v1/objects/${OBJECT}`);
+  });
+
   describe('probe', () => {
     it('checks credentials, not just reachability', async () => {
       const { impl, calls } = stubFetch(

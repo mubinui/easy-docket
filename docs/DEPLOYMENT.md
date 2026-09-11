@@ -132,6 +132,14 @@ to every tagged release.
 | `DOCKET_LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
 | `DOCKET_ALLOWED_ORIGINS` | *(none)* | Comma-separated CORS allowlist for browser clients |
 
+### Storage over time
+
+A vault writes one object per sync and, every few hundred operations, a snapshot
+summarising everything before it. Once a snapshot is written the objects it
+covers are deleted, so storage tracks the size of the ledger rather than the
+number of times it has been synced. Backups of the data directory can therefore
+be taken on an ordinary schedule without growing without bound.
+
 ### Browser clients and CORS
 
 If the PWA is served from a different origin than the server — the usual case,

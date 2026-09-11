@@ -16,10 +16,13 @@ export class InMemoryAdapter implements SyncAdapter {
   readonly objects = new Map<string, Uint8Array>();
 
   /** Call counts, so tests can assert a repeated pull downloads nothing. */
-  readonly calls = { list: 0, get: 0, put: 0, flush: 0, probe: 0 };
+  readonly calls = { list: 0, get: 0, put: 0, remove: 0, flush: 0, probe: 0 };
 
   /** Set to make the next operation fail, simulating a flaky network. */
   failNext: SyncTransportError | null = null;
+
+  /** Set to refuse every delete, standing in for a read-only destination. */
+  failOnRemove = false;
 
   constructor(private readonly shared?: Map<string, Uint8Array>) {
     if (shared) this.objects = shared;
@@ -46,6 +49,15 @@ export class InMemoryAdapter implements SyncAdapter {
     this.calls.put++;
     this.maybeFail();
     this.objects.set(name, bytes);
+  }
+
+  async remove(name: string): Promise<void> {
+    this.calls.remove++;
+    this.maybeFail();
+    if (this.failOnRemove) {
+      throw new SyncTransportError('This destination does not allow deletes', false);
+    }
+    this.objects.delete(name);
   }
 
   async flush(): Promise<void> {

@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
   ListObjectsV2Command,
@@ -76,6 +77,16 @@ export class S3Adapter implements SyncAdapter {
           Body: bytes,
           ContentType: 'application/octet-stream',
         }),
+      ),
+    );
+  }
+
+  async remove(name: string): Promise<void> {
+    // S3 treats deleting a missing key as success, which is the behaviour the
+    // contract wants anyway.
+    await this.run(() =>
+      this.client.send(
+        new DeleteObjectCommand({ Bucket: this.target.bucket, Key: this.key(name) }),
       ),
     );
   }

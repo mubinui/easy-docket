@@ -65,6 +65,10 @@ export class ServerAdapter implements SyncAdapter {
    * failure to surface later as a silent background sync error. The listing
    * request is read-only and writes nothing.
    */
+  async remove(name: string): Promise<void> {
+    await this.request(this.objectUrl(name), { method: 'DELETE' });
+  }
+
   async probe(): Promise<void> {
     await this.request(this.url('v1/health'), { method: 'GET' });
 

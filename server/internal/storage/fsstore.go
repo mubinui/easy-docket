@@ -147,6 +147,36 @@ func (s *FSStore) Get(ctx context.Context, account, name string) ([]byte, error)
 	return data, nil
 }
 
+// Delete removes an object.
+//
+// Idempotent by design: the client prunes objects a snapshot has superseded,
+// and a retry after a half-finished prune must not fail on the ones that
+// already went. Empty directories are left behind; they cost an inode and
+// removing them would race with a concurrent Put.
+func (s *FSStore) Delete(ctx context.Context, account, name string) error {
+	if err := ValidateName(name); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	path, err := s.path(account, name)
+	if err != nil {
+		return err
+	}
+
+	lock := s.accountLock(account)
+	lock.Lock()
+	defer lock.Unlock()
+
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("storage: delete: %w", err)
+	}
+
+	s.usages.Delete(account)
+	return nil
+}
+
 // List walks the account's tree and returns one page of metadata. `cursor` is
 // the last name from the previous page, which works because names are returned
 // in sorted order and objects are immutable.

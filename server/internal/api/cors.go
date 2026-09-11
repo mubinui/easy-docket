@@ -59,7 +59,7 @@ func withCORS(opts corsOptions, next http.Handler) http.Handler {
 				w.WriteHeader(http.StatusForbidden)
 				return
 			}
-			w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, If-None-Match")
 			w.Header().Set("Access-Control-Max-Age", corsMaxAge)
 			w.WriteHeader(http.StatusNoContent)

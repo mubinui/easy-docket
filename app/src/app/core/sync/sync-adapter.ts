@@ -37,6 +37,15 @@ export interface SyncAdapter {
   put(name: string, bytes: Uint8Array): Promise<void>;
 
   /**
+   * Remove an object.
+   *
+   * Deleting something already gone must succeed: pruning happens in batches
+   * and a retry after a half-finished one would otherwise fail on its own
+   * earlier progress. Only ever called for objects a snapshot has superseded.
+   */
+  remove(name: string): Promise<void>;
+
+  /**
    * Called once after a batch of `put`s. Object stores do nothing here; the Git
    * adapter uses it to commit and push, so a sync produces one commit rather
    * than one per operation batch.

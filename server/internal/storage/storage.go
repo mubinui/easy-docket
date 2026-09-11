@@ -56,6 +56,9 @@ type Store interface {
 	List(ctx context.Context, account, prefix, cursor string, limit int) (Listing, error)
 	// Usage reports total bytes stored for an account.
 	Usage(ctx context.Context, account string) (int64, error)
+	// Delete removes an object. Deleting one that is not there succeeds: the
+	// caller wants it gone, and it is.
+	Delete(ctx context.Context, account, name string) error
 }
 
 // objectNamePattern mirrors the layout the client writes:

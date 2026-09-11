@@ -163,8 +163,8 @@ authenticated header, ciphertext. See [Security](SECURITY.md#the-envelope).
 
 ## Sync adapters
 
-One interface: `list`, `get`, `put`, optional `flush`, `probe`. That is the
-whole contract, and it is narrow on purpose — it is what lets the engine be
+One interface: `list`, `get`, `put`, `remove`, optional `flush`, `probe`. That
+is the whole contract, and it is narrow on purpose — it is what lets the engine be
 written once instead of three times.
 
 | Adapter | Notes |

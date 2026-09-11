@@ -62,6 +62,7 @@ func New(opts Options) *Server {
 	mux.Handle("GET /v1/objects", s.authenticated(s.handleList))
 	mux.Handle("GET /v1/objects/{name...}", s.authenticated(s.handleGet))
 	mux.Handle("PUT /v1/objects/{name...}", s.authenticated(s.handlePut))
+	mux.Handle("DELETE /v1/objects/{name...}", s.authenticated(s.handleDelete))
 
 	s.handler = recoverPanics(
 		opts.Logger,
@@ -169,6 +170,22 @@ func (s *Server) handlePut(w http.ResponseWriter, r *http.Request, account auth.
 
 	w.Header().Set("ETag", storage.ETag(data))
 	writeJSON(w, http.StatusCreated, map[string]any{"name": name, "size": len(data)})
+}
+
+// handleDelete removes an object the client no longer needs.
+//
+// Objects are immutable, but they are not permanent: once a snapshot covers a
+// batch of operations, keeping the batch costs the account storage for history
+// nothing will read. Deleting something that is already gone succeeds, so a
+// retried prune does not fail on its own earlier progress.
+func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request, account auth.Account) {
+	name := r.PathValue("name")
+
+	if err := s.opts.Store.Delete(r.Context(), account.ID, name); err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // writeStoreError maps storage failures onto status codes, and keeps anything

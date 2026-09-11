@@ -156,6 +156,58 @@ func TestPutRejectsTraversal(t *testing.T) {
 	}
 }
 
+func TestDelete(t *testing.T) {
+	store := newStore(t, 0)
+	ctx := context.Background()
+	objectName := name(stamp(0))
+
+	if err := store.Put(ctx, "alice", objectName, []byte("payload")); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	if err := store.Delete(ctx, "alice", objectName); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if _, err := store.Get(ctx, "alice", objectName); !errors.Is(err, ErrNotFound) {
+		t.Errorf("object survived deletion: %v", err)
+	}
+
+	t.Run("is idempotent", func(t *testing.T) {
+		// A retried prune must not fail on its own earlier progress.
+		if err := store.Delete(ctx, "alice", objectName); err != nil {
+			t.Errorf("second Delete failed: %v", err)
+		}
+	})
+
+	t.Run("frees the quota", func(t *testing.T) {
+		used, err := store.Usage(ctx, "alice")
+		if err != nil {
+			t.Fatalf("Usage: %v", err)
+		}
+		if used != 0 {
+			t.Errorf("usage = %d after deleting everything, want 0", used)
+		}
+	})
+
+	t.Run("rejects a name outside the permitted layout", func(t *testing.T) {
+		if err := store.Delete(ctx, "alice", "../../etc/passwd"); !errors.Is(err, ErrInvalidName) {
+			t.Errorf("err = %v, want ErrInvalidName", err)
+		}
+	})
+
+	t.Run("cannot reach another account's object", func(t *testing.T) {
+		if err := store.Put(ctx, "bob", objectName, []byte("bob's")); err != nil {
+			t.Fatalf("Put: %v", err)
+		}
+		if err := store.Delete(ctx, "alice", objectName); err != nil {
+			t.Fatalf("Delete: %v", err)
+		}
+		if _, err := store.Get(ctx, "bob", objectName); err != nil {
+			t.Errorf("bob's object was removed by alice: %v", err)
+		}
+	})
+}
+
 func TestList(t *testing.T) {
 	store := newStore(t, 0)
 	ctx := context.Background()
