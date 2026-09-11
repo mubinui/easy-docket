@@ -826,6 +826,13 @@ Things learned the hard way, worth not relearning:
 - **A stub agrees with whatever you wrote.** The Git adapter was unit-tested,
   typed and linted, and had never once worked. Anything that speaks a protocol
   needs to speak it to something that did not come from this repository.
+- **A deployment is not a build.** The Pages workflow built and uploaded cleanly
+  for weeks while hardcoding `--base-href /easy-docket/`. On the custom domain
+  `docket.xiidea.net` the site serves from the root, so every asset URL 404'd
+  and the page was an empty shell. The base path now comes from
+  `actions/configure-pages` (`""` for a custom domain, `"/easy-docket"` for a
+  project site). Green checkmarks say nothing about whether the site loads —
+  open it.
 
 ## Ground rules carried forward
 
