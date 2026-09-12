@@ -235,4 +235,50 @@ test.describe('account groups', () => {
 
     await expect(page.locator(Screen.accounts)).toContainText('$900.00 available');
   });
+
+  test('a card bill is paid from a current account', async ({ page }) => {
+    await openGroups(page);
+    await addGroup(page, 'Credit cards', 'Credit card');
+
+    await addFiledAccount(page, 'Visa', '-1240.00', 'Credit cards');
+    await addAccount(page, 'Current account', '4100.00');
+
+    const screen = page.locator(Screen.accounts);
+    await expect(screen).toContainText('$1,240.00');
+
+    // Pay the whole balance.
+    // `exact`: the row is itself a button, and its accessible name ends up
+    // containing the words of the Pay button nested inside it.
+    await screen.getByRole('button', { name: 'Pay Visa bill', exact: true }).click();
+    const sheet = page.locator('ion-modal.show-modal');
+    await expect(sheet).toBeVisible();
+    await expect(sheet).toContainText('Full balance');
+    // `exact` again: the "Pay from" select is also a button whose name starts
+    // with the same word.
+    await sheet.getByRole('button', { name: 'Pay', exact: true }).click();
+    await waitForEditorClosed(page);
+
+    // The card is clear and the money came out of the current account.
+    await expect(screen).toContainText('$2,860.00');
+    await expect(
+      screen.getByRole('button', { name: 'Pay Visa bill', exact: true }),
+    ).toHaveCount(0);
+
+    // Net worth is unchanged by a payment: it moved, it did not vanish.
+    await expect(screen).toContainText('$2,860.00');
+
+    // And it is an ordinary transfer in the register.
+    await goToTab(page, 'Activity', Screen.transactions);
+    await expect(page.locator(Screen.transactions)).toContainText('Visa');
+  });
+
+  test('a card with nothing owing offers no payment', async ({ page }) => {
+    await openGroups(page);
+    await addGroup(page, 'Credit cards', 'Credit card');
+    await addFiledAccount(page, 'Visa', '0', 'Credit cards');
+
+    await expect(
+      page.locator(Screen.accounts).getByRole('button', { name: 'Pay Visa bill', exact: true }),
+    ).toHaveCount(0);
+  });
 });

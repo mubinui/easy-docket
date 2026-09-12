@@ -22,6 +22,7 @@ import { formatMoney } from '../../core/util/money';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { SyncStatusComponent } from '../../shared/sync-status.component';
 import { AccountEditorComponent } from './account-editor.component';
+import { PayBillComponent } from './pay-bill.component';
 import { RouterLink } from '@angular/router';
 import {
   IonButton,
@@ -45,7 +46,7 @@ import {
 @Component({
   selector: 'app-accounts',
   standalone: true,
-  imports: [RouterLink, MoneyPipe, SyncStatusComponent, AccountEditorComponent, IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonModal, IonNote, IonTitle, IonToolbar],
+  imports: [RouterLink, MoneyPipe, SyncStatusComponent, AccountEditorComponent, PayBillComponent, IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonModal, IonNote, IonTitle, IonToolbar],
   styles: [
     `
       .total {
@@ -129,6 +130,22 @@ import {
                     <br /><small>≈ {{ inReporting }}</small>
                   }
                 </ion-note>
+                @if (payable(account, section)) {
+                  <!--
+                    A button inside the row rather than a swipe action: a swipe
+                    is invisible until you try it, and this is the one thing a
+                    person opens the app to do on a card.
+                  -->
+                  <ion-button
+                    slot="end"
+                    fill="outline"
+                    size="small"
+                    [attr.aria-label]="'Pay ' + account.name + ' bill'"
+                    (click)="startPayment(account, $event)"
+                  >
+                    Pay
+                  </ion-button>
+                }
               </ion-item>
             }
           </ion-list>
@@ -157,6 +174,16 @@ import {
           <ion-icon name="add-outline" />
         </ion-fab-button>
       </ion-fab>
+
+      <ion-modal [isOpen]="paying() !== null" (didDismiss)="paying.set(null)">
+        <ng-template>
+          <app-pay-bill
+            [card]="paying()"
+            (paid)="paying.set(null)"
+            (cancelled)="paying.set(null)"
+          />
+        </ng-template>
+      </ion-modal>
 
       <ion-modal [isOpen]="editorOpen()" (didDismiss)="close()">
         <ng-template>
@@ -203,6 +230,7 @@ export class AccountsPage {
 
   readonly editorOpen = signal(false);
   readonly editing = signal<Account | null>(null);
+  readonly paying = signal<Account | null>(null);
 
   archived(): Account[] {
     return this.accounts.all().filter((account) => account.archived);
@@ -235,6 +263,22 @@ export class AccountsPage {
     }
 
     return parts.length ? parts.join(' · ') : account.kind;
+  }
+
+  /** Whether this row offers a payment: a card with something on it. */
+  payable(account: Account, section: AccountSection): boolean {
+    return section.owed && this.balanceOf(account) < 0;
+  }
+
+  /**
+   * Open the payment sheet.
+   *
+   * The click is stopped from reaching the row, which would otherwise open the
+   * account editor underneath the sheet.
+   */
+  startPayment(account: Account, event: Event): void {
+    event.stopPropagation();
+    this.paying.set(account);
   }
 
   /** What the row shows: money owed on a card, money held everywhere else. */

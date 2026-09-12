@@ -1,5 +1,6 @@
-import { Account, Minor } from '../models/domain';
+import { Account, Minor, Transaction } from '../models/domain';
 import { addMonths, daysInMonth, toIsoDate } from '../util/dates';
+import { signedFor } from '../util/money';
 
 /**
  * When a card's statement closes and when the bill falls due.
@@ -74,4 +75,108 @@ export function hasCycle(account: Account): boolean {
 export function availableCredit(balance: Minor, creditLimit: Minor | undefined): Minor | null {
   if (typeof creditLimit !== 'number') return null;
   return creditLimit + balance;
+}
+
+/**
+ * What a card's bill looks like right now.
+ *
+ * Amounts are stated as debts: positive means money is owed, which is the
+ * opposite sign to the ledger balance and the same sign as a paper statement.
+ */
+export interface StatementSummary {
+  /** The day the statement closed. */
+  closedOn: string;
+  /** The day it has to be paid by. */
+  dueOn: string;
+  /** Owed as at the close — the figure printed on the statement. */
+  statementBalance: Minor;
+  /** Money paid onto the card since the close. */
+  paidSince: Minor;
+  /**
+   * What is left of that statement to pay.
+   *
+   * Floored at zero: overpaying leaves nothing due rather than a negative bill,
+   * and the credit shows up in the balance where it belongs.
+   */
+  remaining: Minor;
+  /**
+   * Owed right now, spending since the close included.
+   *
+   * Deliberately not what is due: this month's shopping is on the statement
+   * that has not closed yet, and paying it early is a choice rather than an
+   * obligation.
+   */
+  currentBalance: Minor;
+}
+
+/**
+ * The ledger's sign, flipped to "owed".
+ *
+ * `-0` is normalised away: negating a zero balance produces it, and a card with
+ * nothing on it would otherwise format as "−$0.00".
+ */
+function owed(balance: Minor): Minor {
+  return balance === 0 ? 0 : -balance;
+}
+
+/** Balance of an account on a date, opening balance included. */
+function balanceAsOf(account: Account, transactions: readonly Transaction[], date: string): Minor {
+  let total = account.openingBalance;
+  for (const txn of transactions) {
+    if (txn.date > date) continue;
+    total += signedFor(account.id, txn);
+  }
+  return total;
+}
+
+/**
+ * Summarise a card's cycle, or null when it has no terms to summarise.
+ *
+ * `transactions` may be the whole ledger; only the ones touching this account
+ * count, which `signedFor` already decides.
+ */
+export function summariseStatement(
+  account: Account,
+  transactions: readonly Transaction[],
+  asOf = toIsoDate(),
+): StatementSummary | null {
+  if (!hasCycle(account)) return null;
+
+  const closedOn = lastStatementDate(account.statementDay!, asOf);
+  const dueOn = dueDateFor(account.dueDay!, closedOn);
+
+  // Negated on the way out: the ledger holds a debt as a negative balance, and
+  // everything below this line talks about what is owed.
+  const statementBalance = owed(balanceAsOf(account, transactions, closedOn));
+  const currentBalance = owed(balanceAsOf(account, transactions, asOf));
+
+  let paidSince = 0;
+  for (const txn of transactions) {
+    if (txn.date <= closedOn || txn.date > asOf) continue;
+    const effect = signedFor(account.id, txn);
+    // Money arriving on the card is a payment; spending is not.
+    if (effect > 0) paidSince += effect;
+  }
+
+  return {
+    closedOn,
+    dueOn,
+    statementBalance,
+    paidSince,
+    remaining: Math.max(statementBalance - paidSince, 0),
+    currentBalance,
+  };
+}
+
+/** Whether a bill is due within `days`, and still owing. */
+export function isDueSoon(summary: StatementSummary, days: number, asOf = toIsoDate()): boolean {
+  if (summary.remaining <= 0) return false;
+  return summary.dueOn >= asOf && daysBetween(asOf, summary.dueOn) <= days;
+}
+
+/** Whole days from `from` to `to`, both `YYYY-MM-DD`. */
+export function daysBetween(from: string, to: string): number {
+  const [fy, fm, fd] = from.split('-').map(Number);
+  const [ty, tm, td] = to.split('-').map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
 }

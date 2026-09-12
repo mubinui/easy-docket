@@ -29,9 +29,9 @@ Every task follows the same loop, and none of it is optional:
 | 4 | Recurring transactions | ✅ Done |
 | 5 | Multi-currency | ✅ Done |
 | 6 | Release readiness | ✅ Done |
-| 7 | Account groups & credit cards | ⏳ In progress |
+| 7 | Account groups & credit cards | ✅ Done |
 
-Tests today: **678 client unit**, **73 end-to-end**, **95 Go**.
+Tests today: **735 client unit**, **75 end-to-end**, **95 Go**.
 
 ---
 
@@ -974,19 +974,58 @@ is available.
 returns null rather than zero when no limit is recorded, so a card with no limit
 says nothing about available credit instead of implying it is exhausted.
 
-### 7.5 Pay the bill
+### 7.5 Pay the bill ✅
 
-- [ ] `core/cards/statement.ts`, pure: given a card's transactions and its
-      terms, the closed statement balance, the current balance, and the due date
-- [ ] "Pay bill" on a credit-card account: pick a funding account, offer
-      statement balance / full balance / custom, record a transfer
-- [ ] Due-soon surfacing on the dashboard
+- [x] `summariseStatement` in `core/cards/statement.ts`, pure: the closed
+      statement balance, payments made since, what is left, and the balance today
+- [x] `PayBillService` — summarise a card, and record a payment
+- [x] "Pay" on a card row, opening a sheet: statement balance / full balance /
+      another amount, a funding account, a date
+- [x] A "Bills due" card on the Summary screen, shown only when something is due
+      within a fortnight
 
-**Tests**
-- [ ] Unit: statement windows, a payment inside the window, a card with no
-      terms set, a card paid twice in one cycle
-- [ ] e2e: spend on a card, pay it from a current account, both balances move by
-      the right amount and net worth is unchanged by the payment
+**Tests** (57 added, 678 → 735; plus 2 end-to-end, 73 → 75)
+- [x] Unit (statement): debts stated positive, the opening balance counted,
+      spending after the close left off, spending *on* the closing day counted,
+      payments since the close credited, an overpayment floored at nothing due
+      while the credit survives in the balance, other accounts' transactions
+      ignored, future-dated transactions ignored, an unpaid statement carried
+      into the next cycle; `daysBetween` across months, years and both daylight
+      saving changes; `isDueSoon` inside, outside, on the day, and overdue
+- [x] Unit (service): a payment is an ordinary transfer, it settles the
+      statement it was meant to, and it refuses nothing, a negative, a card
+      paying itself, and a cross-currency payment — naming both currencies
+- [x] Component: which accounts may fund a payment and which may not, the
+      default choice, the three amounts, nonsense treated as nothing, and a
+      refusal surfacing rather than appearing to succeed
+- [x] Component (dashboard): nothing shown without cards, without terms, or
+      without a balance; a due bill shown with what is left; archived cards left
+      out; "due today", "due tomorrow", "due in 9 days"
+- [x] e2e: pay a card from a current account and watch both balances move, the
+      Pay button disappear, and the payment appear in the register as a transfer
+
+**A payment is an ordinary transfer.** There is no payment kind and no new
+field. A second way to spell a transfer would mean every report, every balance
+and every adapter had to learn about both, and the ledger already models "money
+leaves here and arrives there" exactly.
+
+**Cross-currency payments are refused, not invented.** A transfer carries one
+amount, so paying a dollar card from a euro account would need a rate — and a
+rate chosen here is a number in the register that the bank never used. The
+funding list only offers accounts in the card's currency, the service refuses
+the rest by name, and the sheet says why when there is nothing to offer.
+
+**Another credit card is never offered as a funding account.** Paying a card
+with a card is not something this app models.
+
+**The statement figure is what is *due*, not what is owed.** Spending since the
+close belongs to the statement that has not closed yet; paying it early is a
+choice, so it appears under "full balance" instead. An overpayment floors the
+bill at nothing due rather than showing a negative one, and the credit shows up
+in the balance where it belongs.
+
+**The card only appears when a bill is actually due.** A summary card that
+permanently says "nothing due" is one people stop reading.
 
 ---
 

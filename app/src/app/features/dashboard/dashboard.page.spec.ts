@@ -6,7 +6,13 @@ import { MemorySecureStore, SecureStore } from '../../core/keys/secure-store';
 import { DocketDb } from '../../core/db/docket-db';
 import { LedgerService } from '../../core/repositories/ledger.service';
 import { toIsoDate } from '../../core/util/dates';
-import { aBudget, aCategory, anAccount, aTransaction } from '../../core/testing/factories';
+import {
+  aBudget,
+  aCategory,
+  anAccount,
+  anAccountGroup,
+  aTransaction,
+} from '../../core/testing/factories';
 import { waitUntil } from '../../core/testing/async';
 import { DashboardPage } from './dashboard.page';
 
@@ -160,5 +166,149 @@ describe('DashboardPage budget card', () => {
 
     expect(page.headline()).toHaveLength(0);
     expect(budgetCardText()).toContain('Set a spending limit');
+  });
+});
+
+/**
+ * The bills-due card.
+ *
+ * Scoped to that card alone, for the same reason as the budget card above: the
+ * Summary screen has several, and a page-wide assertion proves very little.
+ */
+describe('DashboardPage bills due', () => {
+  let fixture: ComponentFixture<DashboardPage>;
+  let page: DashboardPage;
+  let db: DocketDb;
+
+  /** A due day a few days out, so the bill lands inside the two-week window. */
+  function inDays(days: number): number {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return date.getDate();
+  }
+
+  beforeEach(async () => {
+    db = new DocketDb(`bills-${counter++}`);
+    await db.accountGroups.bulkPut([
+      anAccountGroup({ id: 'g-cards', name: 'Cards', type: 'credit-card' }),
+      anAccountGroup({ id: 'g-day', name: 'Everyday', type: 'default' }),
+    ]);
+  });
+
+  async function render(cards = 0): Promise<void> {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [DashboardPage],
+      providers: [
+        { provide: DOCKET_DB, useValue: db },
+        { provide: SecureStore, useClass: MemorySecureStore },
+        provideRouter([]),
+      ],
+    });
+    await TestBed.inject(LedgerService).initialise('aaaaaaaa');
+
+    fixture = TestBed.createComponent(DashboardPage);
+    page = fixture.componentInstance;
+    fixture.detectChanges();
+
+    await settle(() => page.accounts.all().length >= cards);
+    fixture.detectChanges();
+  }
+
+  function billsCard(): HTMLElement | null {
+    const cards = [...(fixture.nativeElement as HTMLElement).querySelectorAll('ion-card')];
+    return (cards.find((card) => card.textContent?.includes('Bills due')) as HTMLElement) ?? null;
+  }
+
+  it('says nothing at all when there are no cards', async () => {
+    await db.accounts.put(anAccount({ id: 'a-1', groupId: 'g-day' }));
+    await render(1);
+
+    expect(page.cards.dueSoon()).toEqual([]);
+    expect(billsCard()).toBeNull();
+  });
+
+  it('says nothing when a card has no terms', async () => {
+    await db.accounts.put(
+      anAccount({ id: 'a-visa', groupId: 'g-cards', openingBalance: -100_00 }),
+    );
+    await render(1);
+
+    expect(page.cards.bills()).toEqual([]);
+    expect(billsCard()).toBeNull();
+  });
+
+  it('says nothing when a card owes nothing', async () => {
+    await db.accounts.put(
+      anAccount({
+        id: 'a-visa',
+        groupId: 'g-cards',
+        openingBalance: 0,
+        statementDay: inDays(-20),
+        dueDay: inDays(3),
+      }),
+    );
+    await render(1);
+
+    expect(page.cards.dueSoon()).toEqual([]);
+    expect(billsCard()).toBeNull();
+  });
+
+  it('shows a bill that is due soon, with what is left to pay', async () => {
+    await db.accounts.put(
+      anAccount({
+        id: 'a-visa',
+        name: 'Visa',
+        groupId: 'g-cards',
+        openingBalance: -1_240_00,
+        statementDay: inDays(-20),
+        dueDay: inDays(3),
+      }),
+    );
+    await render(1);
+    await settle(() => page.cards.dueSoon().length === 1);
+    fixture.detectChanges();
+
+    const card = billsCard();
+    expect(card).not.toBeNull();
+    expect(card!.textContent).toContain('Visa');
+    expect(card!.textContent).toContain('$1,240.00');
+  });
+
+  it('leaves out an archived card', async () => {
+    await db.accounts.put(
+      anAccount({
+        id: 'a-visa',
+        groupId: 'g-cards',
+        archived: true,
+        openingBalance: -100_00,
+        statementDay: inDays(-20),
+        dueDay: inDays(3),
+      }),
+    );
+    await render(1);
+
+    expect(page.cards.dueSoon()).toEqual([]);
+  });
+
+  describe('describing when', () => {
+    it('counts the days rather than printing a date', async () => {
+      await render();
+      const future = new Date();
+      future.setDate(future.getDate() + 9);
+      const iso = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`;
+
+      expect(page.dueIn(iso)).toBe('due in 9 days');
+    });
+
+    it('says today and tomorrow in words', async () => {
+      await render();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const iso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+      expect(page.dueIn(toIsoDate())).toBe('due today');
+      expect(page.dueIn(iso)).toBe('due tomorrow');
+    });
   });
 });

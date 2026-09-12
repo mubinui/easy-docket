@@ -7,6 +7,9 @@ import {
   chevronForwardOutline,
   cloudOfflineOutline,
 } from 'ionicons/icons';
+import { CardBillsService } from '../../core/cards/card-bills.service';
+import { daysBetween } from '../../core/cards/statement';
+import { toIsoDate } from '../../core/util/dates';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { BudgetsService } from '../../core/repositories/budgets.service';
 import { RatesService } from '../../core/repositories/rates.service';
@@ -121,6 +124,33 @@ import {
           }
         </ion-card-content>
       </ion-card>
+
+      @if (cards.dueSoon().length) {
+        <!--
+          Only rendered when something is actually due: a card that is always on
+          screen saying "nothing due" is a card people stop reading.
+        -->
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>Bills due</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-list lines="none">
+              @for (bill of cards.dueSoon(); track bill.card.id) {
+                <ion-item button routerLink="/tabs/accounts">
+                  <ion-label>
+                    <h3>{{ bill.card.name }}</h3>
+                    <p>{{ dueIn(bill.summary.dueOn) }}</p>
+                  </ion-label>
+                  <ion-note slot="end">
+                    {{ bill.summary.remaining | money: bill.card.currency }}
+                  </ion-note>
+                </ion-item>
+              }
+            </ion-list>
+          </ion-card-content>
+        </ion-card>
+      }
 
       <ion-card>
         <ion-card-header>
@@ -273,6 +303,7 @@ export class DashboardPage {
   readonly categories = inject(CategoriesService);
   readonly transactions = inject(TransactionsService);
   readonly budgets = inject(BudgetsService);
+  readonly cards = inject(CardBillsService);
   readonly rates = inject(RatesService);
   private readonly scheduler = inject(SyncSchedulerService);
 
@@ -283,6 +314,14 @@ export class DashboardPage {
   readonly unconvertedAccounts = computed(() => this.accounts.netWorthDetail().unconverted);
 
   readonly recent = computed(() => this.transactions.visible().slice(0, 5));
+
+  /** "due today", "due tomorrow", "due in 9 days" — a distance, not a date. */
+  dueIn(date: string): string {
+    const days = daysBetween(toIsoDate(), date);
+    if (days <= 0) return 'due today';
+    if (days === 1) return 'due tomorrow';
+    return `due in ${days} days`;
+  }
 
   /**
    * The few budgets worth seeing without opening the budgets screen: those
