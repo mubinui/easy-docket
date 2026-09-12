@@ -202,6 +202,38 @@ export async function addAccount(page: Page, name: string, opening: string): Pro
   ).toBeVisible();
 }
 
+/**
+ * Choose a category through the picker the transaction editor opens.
+ *
+ * Takes either a top-level name ("Groceries") or a path ("Groceries › Corner
+ * shop"). Tapping a parent that has subcategories selects it and opens them
+ * rather than closing, so where no subcategory was asked for the sheet is
+ * closed explicitly.
+ */
+export async function chooseCategory(page: Page, path: string): Promise<void> {
+  const [parent, child] = path.split('›').map((part) => part.trim());
+
+  await (await surface(page)).locator('ion-item').filter({ hasText: 'Category' }).first().click();
+
+  const picker = page.locator('app-category-picker');
+  await picker.waitFor({ state: 'visible' });
+  await picker.getByRole('button', { name: parent, exact: true }).click();
+
+  if (child) {
+    await picker.getByRole('button', { name: child, exact: true }).click();
+  } else {
+    // A category with no subcategories closes the sheet by itself; one with
+    // subcategories opens them and waits. Rather than ask which it was — the
+    // answer changes as a vault grows — give it a moment to close and only
+    // press Close if it is still there.
+    await picker
+      .waitFor({ state: 'detached', timeout: 2_000 })
+      .catch(() => picker.getByRole('button', { name: 'Close' }).click());
+  }
+
+  await expect(picker).toHaveCount(0);
+}
+
 export async function addExpense(
   page: Page,
   amount: string,
@@ -212,7 +244,7 @@ export async function addExpense(
   await tapAdd(page, Screen.transactions);
 
   await fillField(page, 'Amount', amount);
-  if (category) await chooseOption(page, 'Category', category);
+  if (category) await chooseCategory(page, category);
   await fillField(page, 'Payee', payee);
   await tap(page, 'Save');
 
