@@ -9,11 +9,19 @@
 
   <meta name="color-scheme" content="light dark"/>
   <meta name="description" content="Offline-first personal money manager with end-to-end encrypted sync."/>
-  <meta name="theme-color" content="#3880ff"/>
+  <meta name="theme-color" content="#0054e9"/>
   <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <meta name="format-detection" content="telephone=no"/>
   <meta name="msapplication-tap-highlight" content="no"/>
 
+  <!--
+    SVG first, for browsers that take it: one file, sharp at any size. The PNGs
+    are the fallback, and are a simplified drawing of the same mark — at 16px
+    the full icon's three entries close into a grey smudge.
+  -->
+  <link rel="icon" type="image/svg+xml" href="assets/icon/favicon.svg"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon/favicon-32x32.png"/>
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icon/favicon-16x16.png"/>
   <link rel="icon" type="image/png" href="assets/icon/favicon.png"/>
 
   <!-- add to homescreen for ios -->

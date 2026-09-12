@@ -196,3 +196,33 @@ The phase-one schema already leaves room for what comes next:
   app open, emitting ordinary transactions so history stays a flat log.
 - **Multi-currency** — `Account.currency` already exists per account; what is
   missing is a rate table and a reporting currency.
+
+## The icon
+
+One source, `app/src/assets/icon/icon-glyph.svg`: a docket, the paid slip the
+app is named for, drawn wide and sitting slightly high so the torn bottom edge
+does not pull it visually low.
+
+Every raster is composed from it by `app/tools/render-icons.mjs` — the PWA icon
+set, the Android launcher, its adaptive foreground, the round legacy icon, and
+the splash screens — so the mark has exactly one definition and a change cannot
+reach some surfaces while missing others:
+
+```console
+$ cd app && npm run icons
+```
+
+Rendering is done with headless Chrome, which the repository already carries for
+the end-to-end suite; each size is drawn from the vector rather than resampled
+from one large bitmap.
+
+Two decisions worth knowing:
+
+- **The mark is laid out for a maskable icon.** The background is full-bleed and
+  the glyph sits inside the middle 62%, which survives the circle Android crops
+  adaptive icons to. A maskable icon with transparent corners gets those corners
+  filled in by the launcher, in a colour nobody chose.
+- **The favicon is a second drawing.** `favicon.svg` carries two thick entries
+  instead of three and fills more of the canvas, because at 16px the full icon's
+  three lines close into a grey smudge. It is the only place the mark is drawn
+  twice, and the reason is legibility at a size nothing else has to survive.

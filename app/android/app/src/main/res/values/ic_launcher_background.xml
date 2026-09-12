@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!--
+        The background half of the adaptive icon. The mark is white, so this has
+        to be the brand blue: on the default white it would be an all but
+        invisible icon.
+    -->
+    <color name="ic_launcher_background">#0054E9</color>
 </resources>
