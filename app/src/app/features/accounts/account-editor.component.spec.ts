@@ -4,7 +4,7 @@ import { DOCKET_DB } from '../../core/db/db.token';
 import { DocketDb } from '../../core/db/docket-db';
 import { LedgerService } from '../../core/repositories/ledger.service';
 import { waitUntil } from '../../core/testing/async';
-import { anAccount, anAccountGroup } from '../../core/testing/factories';
+import { anAccount, anAccountGroup, aTransaction } from '../../core/testing/factories';
 import { AccountEditorComponent } from './account-editor.component';
 
 let counter = 0;
@@ -254,5 +254,104 @@ describe('AccountEditorComponent card terms', () => {
     expect(component.creditLimit()).toBe('2500.00');
     expect(component.statementDay()).toBe(1);
     expect(component.dueDay()).toBe(20);
+  });
+});
+
+describe('AccountEditorComponent currency', () => {
+  let fixture: ComponentFixture<AccountEditorComponent>;
+  let component: AccountEditorComponent;
+  let db: DocketDb;
+
+  beforeEach(async () => {
+    db = new DocketDb(`currency-editor-${counter++}`);
+    await db.vaultSettings.put({
+      id: 'vault',
+      reportingCurrency: 'BDT',
+      createdAt: 1,
+      updatedAt: '',
+    });
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [AccountEditorComponent],
+      providers: [{ provide: DOCKET_DB, useValue: db }],
+    });
+    await TestBed.inject(LedgerService).initialise('aaaaaaaa');
+
+    fixture = TestBed.createComponent(AccountEditorComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('opens a new account in the vault\'s currency', async () => {
+    // Not the first account's: a vault that works in taka should not offer
+    // dollars the moment one foreign account exists.
+    await waitUntil(() => component.currency() === 'BDT');
+    expect(component.currency()).toBe('BDT');
+  });
+
+  it('keeps the vault currency even when another account uses something else', async () => {
+    await db.accounts.put(anAccount({ id: 'a-usd', name: 'Aardvark', currency: 'USD' }));
+    fixture.componentRef.setInput('existing', null);
+    fixture.detectChanges();
+
+    await waitUntil(() => component.currency() === 'BDT');
+    expect(component.currency()).toBe('BDT');
+  });
+
+  describe('changing it later', () => {
+    it('is allowed while the account has no transactions', async () => {
+      // What makes a seeded account fixable rather than something to delete
+      // and recreate.
+      const existing = anAccount({ id: 'a-1', currency: 'USD' });
+      await db.accounts.put(existing);
+      fixture.componentRef.setInput('existing', existing);
+      fixture.detectChanges();
+
+      await waitUntil(() => component.recorded() === 0);
+      expect(component.currencyLocked()).toBe(false);
+
+      component.currency.set('BDT');
+      await component.save();
+      expect((await db.accounts.get('a-1'))?.currency).toBe('BDT');
+    });
+
+    it('is refused once anything is recorded against it', async () => {
+      // Changing it would reinterpret every amount: 4,100 dollars silently
+      // becomes 4,100 taka.
+      const existing = anAccount({ id: 'a-1', currency: 'USD' });
+      await db.accounts.put(existing);
+      await db.transactions.put(aTransaction({ id: 't-1', accountId: 'a-1' }));
+      fixture.componentRef.setInput('existing', existing);
+      fixture.detectChanges();
+
+      await waitUntil(() => component.recorded() === 1);
+      expect(component.currencyLocked()).toBe(true);
+    });
+
+    it('counts a transfer that only arrives at the account', async () => {
+      const existing = anAccount({ id: 'a-1', currency: 'USD' });
+      await db.accounts.put(existing);
+      await db.transactions.put(
+        aTransaction({ id: 't-1', kind: 'transfer', accountId: 'a-other', counterAccountId: 'a-1' }),
+      );
+      fixture.componentRef.setInput('existing', existing);
+      fixture.detectChanges();
+
+      await waitUntil(() => component.recorded() === 1);
+      expect(component.currencyLocked()).toBe(true);
+    });
+
+    it('stays locked while the count is still unknown', async () => {
+      // Refusing briefly is recoverable; offering a change that turns out to
+      // be unsafe is not.
+      const existing = anAccount({ id: 'a-1', currency: 'USD' });
+      await db.accounts.put(existing);
+      fixture.componentRef.setInput('existing', existing);
+      fixture.detectChanges();
+
+      expect(component.recorded()).toBeNull();
+      expect(component.currencyLocked()).toBe(true);
+    });
   });
 });

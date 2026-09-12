@@ -169,12 +169,17 @@ export async function tapAdd(page: Page, screen: string): Promise<void> {
 }
 
 /** Create a vault and land on the summary screen. */
-export async function createVault(page: Page, passphrase = PASSPHRASE): Promise<void> {
+export async function createVault(
+  page: Page,
+  passphrase = PASSPHRASE,
+  currency?: string,
+): Promise<void> {
   await page.goto('/');
   await expect(page.getByText('Set up your vault')).toBeVisible();
 
   await fillField(page, 'Passphrase', passphrase, Screen.vault);
   await fillField(page, 'Confirm passphrase', passphrase, Screen.vault);
+  if (currency) await chooseOption(page, 'Currency', currency, Screen.vault);
   await tap(page, 'Create vault', Screen.vault);
 
   await expect(page).toHaveURL(/\/tabs\/dashboard/);

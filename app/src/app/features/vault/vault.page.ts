@@ -6,7 +6,9 @@ import { lockClosedOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import { runInInjectionContext, EnvironmentInjector } from '@angular/core';
 import { activateVault } from '../../core/app-bootstrap';
 import { VaultService } from '../../core/keys/vault.service';
+import { COMMON_CURRENCIES, guessCurrency } from '../../core/money/currencies';
 import { AccountGroupsService } from '../../core/repositories/account-groups.service';
+import { RatesService } from '../../core/repositories/rates.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
 import {
   IonButton,
@@ -14,6 +16,8 @@ import {
   IonIcon,
   IonInput,
   IonNote,
+  IonSelect,
+  IonSelectOption,
   IonSpinner,
   IonText,
 } from '@ionic/angular';
@@ -29,7 +33,7 @@ import {
 @Component({
   selector: 'app-vault',
   standalone: true,
-  imports: [FormsModule, IonButton, IonContent, IonIcon, IonInput, IonNote, IonSpinner, IonText],
+  imports: [FormsModule, IonButton, IonContent, IonIcon, IonInput, IonNote, IonSelect, IonSelectOption, IonSpinner, IonText],
   styles: [
     `
       .vault {
@@ -95,6 +99,28 @@ import {
             This passphrase encrypts your ledger. It is never uploaded and cannot be reset — if you
             lose it, the data is unrecoverable by design.
           </ion-note>
+
+          <!--
+            Asked now rather than settled silently. Totals are shown in this
+            currency and the starter accounts are opened in it, and finding out
+            a month later that the vault thinks in dollars is expensive to
+            undo. It can still be changed later in Settings.
+          -->
+          <ion-select
+            label="Currency"
+            labelPlacement="stacked"
+            fill="outline"
+            [ngModel]="currency()"
+            (ngModelChange)="currency.set($event)"
+          >
+            @for (code of currencies; track code) {
+              <ion-select-option [value]="code">{{ code }}</ion-select-option>
+            }
+          </ion-select>
+          <ion-note>
+            Totals are shown in this, and your starter accounts open in it. Changeable later in
+            Settings.
+          </ion-note>
         }
 
         <div class="error">
@@ -126,6 +152,12 @@ export class VaultPage {
   readonly vault = inject(VaultService);
   private readonly categories = inject(CategoriesService);
   private readonly groups = inject(AccountGroupsService);
+  private readonly rates = inject(RatesService);
+
+  readonly currencies = COMMON_CURRENCIES;
+
+  /** Guessed from the device's locale, and shown as a choice rather than applied. */
+  readonly currency = signal(guessCurrency());
   private readonly router = inject(Router);
   private readonly injector = inject(EnvironmentInjector);
 
@@ -149,6 +181,9 @@ export class VaultPage {
     try {
       if (this.creating()) {
         await this.vault.create(this.passphrase());
+        // Before the seed: the starter accounts are opened in the vault's
+        // currency, and the seed reads it.
+        await this.rates.setReportingCurrency(this.currency());
         await this.categories.seedIfEmpty();
         await this.groups.seedIfEmpty();
       } else {

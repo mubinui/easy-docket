@@ -9,9 +9,11 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { COMMON_CURRENCIES } from '../../core/money/currencies';
 import { Account, AccountKind } from '../../core/models/domain';
 import { AccountGroupsService } from '../../core/repositories/account-groups.service';
 import { AccountsService } from '../../core/repositories/accounts.service';
+import { RatesService } from '../../core/repositories/rates.service';
 import { formatAmount, parseAmount } from '../../core/util/money';
 import {
   IonButton,
@@ -39,8 +41,7 @@ const KINDS: ReadonlyArray<{ value: AccountKind; label: string; icon: string }> 
   { value: 'investment', label: 'Investment', icon: 'trending-up-outline' },
 ];
 
-/** Common ISO 4217 codes; the field accepts any three-letter code. */
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'BDT', 'AUD', 'CAD', 'JPY', 'SGD', 'AED'];
+
 
 @Component({
   selector: 'app-account-editor',
@@ -107,9 +108,9 @@ const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'BDT', 'AUD', 'CAD', 'JPY', 'SGD
           <ion-select
             label="Currency"
             labelPlacement="stacked"
-            [disabled]="!!existing()"
+            [disabled]="currencyLocked()"
             [ngModel]="currency()"
-            (ngModelChange)="currency.set($event)"
+            (ngModelChange)="setCurrency($event)"
           >
             @for (code of currencies; track code) {
               <ion-select-option [value]="code">{{ code }}</ion-select-option>
@@ -191,9 +192,11 @@ const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'BDT', 'AUD', 'CAD', 'JPY', 'SGD
 
       <ion-item lines="none">
         <ion-note>
-          @if (existing()) {
-            The currency is fixed once an account exists, because changing it would silently
-            reinterpret every amount already recorded against it.
+          @if (currencyLocked()) {
+            The currency is fixed once an account has transactions, because changing it would
+            silently reinterpret every amount already recorded against it.
+          } @else if (existing()) {
+            The currency can still be changed while the account has no transactions.
           } @else {
             The opening balance is what the account held before your first recorded transaction.
           }
@@ -211,13 +214,14 @@ const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'BDT', 'AUD', 'CAD', 'JPY', 'SGD
 export class AccountEditorComponent {
   private readonly accounts = inject(AccountsService);
   readonly groups = inject(AccountGroupsService);
+  private readonly rates = inject(RatesService);
 
   readonly existing = input<Account | null>(null);
   readonly saved = output<Account>();
   readonly cancelled = output<void>();
 
   readonly kinds = KINDS;
-  readonly currencies = CURRENCIES;
+  readonly currencies = COMMON_CURRENCIES;
 
   readonly name = signal('');
   readonly kind = signal<AccountKind>('bank');
@@ -239,6 +243,31 @@ export class AccountEditorComponent {
   );
   readonly error = signal<string | null>(null);
 
+  /** Transactions already recorded against this account, or null while counting. */
+  readonly recorded = signal<number | null>(null);
+
+  /** Whether the user has picked a currency, as opposed to being offered one. */
+  private readonly currencyTouched = signal(false);
+
+  setCurrency(code: string): void {
+    this.currencyTouched.set(true);
+    this.currency.set(code);
+  }
+
+  /**
+   * Whether the currency may still be changed.
+   *
+   * History is what locks it, not existence. Changing the currency of an
+   * account that has transactions silently reinterprets every amount on it —
+   * 4,100 dollars becomes 4,100 taka. An account with nothing on it has nothing
+   * to reinterpret, which is what makes a seeded account fixable rather than
+   * something to delete and recreate.
+   *
+   * Locked while the count is unknown: refusing briefly is recoverable, and
+   * offering a change that turns out to be unsafe is not.
+   */
+  readonly currencyLocked = computed(() => this.existing() !== null && this.recorded() !== 0);
+
   constructor() {
     effect(() => {
       const account = this.existing();
@@ -255,10 +284,13 @@ export class AccountEditorComponent {
         this.name.set(account.name);
         this.kind.set(account.kind);
         this.currency.set(account.currency);
+        this.currencyTouched.set(true);
         this.openingBalance.set(formatAmount(account.openingBalance, account.currency));
         // A group deleted elsewhere reads as no group rather than as a dangling
         // selection the picker could not display.
         this.groupId.set(this.groups.byId(account.groupId)?.id ?? null);
+        this.recorded.set(null);
+        void this.accounts.transactionCount(account.id).then((count) => this.recorded.set(count));
         this.creditLimit.set(
           typeof account.creditLimit === 'number'
             ? formatAmount(account.creditLimit, account.currency)
@@ -270,11 +302,14 @@ export class AccountEditorComponent {
       } else {
         this.name.set('');
         this.kind.set('bank');
-        // Match the ledger's existing currency so a second account lines up
-        // with the first by default.
-        this.currency.set(this.accounts.active()[0]?.currency ?? 'USD');
+        // The vault's currency, not the first account's. Copying whichever
+        // account happens to sort first means a vault that works in taka
+        // offers dollars the moment one foreign account exists.
+        this.currency.set(this.rates.reportingCurrency());
+        this.currencyTouched.set(false);
         this.openingBalance.set('0.00');
         this.groupId.set(null);
+        this.recorded.set(0);
         this.creditLimit.set('');
         this.statementDay.set(null);
         this.dueDay.set(null);
@@ -283,6 +318,22 @@ export class AccountEditorComponent {
       this.error.set(null);
     }
   }
+
+  /**
+   * Offer the vault's currency once it is known.
+   *
+   * The reset above runs before Dexie has read the settings row, so it sees the
+   * fallback rather than the vault's own currency. This fills that in — but
+   * only for a new account and only while the field has not been touched, so a
+   * deliberate choice is never overwritten.
+   */
+  private readonly offerVaultCurrency = effect(() => {
+    const vaultCurrency = this.rates.reportingCurrency();
+    untracked(() => {
+      if (this.existing() || this.currencyTouched()) return;
+      this.currency.set(vaultCurrency);
+    });
+  });
 
   async save(): Promise<void> {
     this.error.set(null);

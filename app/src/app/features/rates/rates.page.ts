@@ -25,6 +25,7 @@ import {
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { addOutline, swapHorizontalOutline } from 'ionicons/icons';
+import { COMMON_CURRENCIES } from '../../core/money/currencies';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { PairSummary, RatesService } from '../../core/repositories/rates.service';
 import { toIsoDate } from '../../core/util/dates';
@@ -223,7 +224,7 @@ export class RatesPage {
   /** Currencies in play, plus the common ones, so the picker is never empty. */
   readonly currencyOptions = computed(() => {
     const used = this.accounts.all().map((account) => account.currency);
-    const common = ['USD', 'EUR', 'GBP', 'INR', 'BDT', 'AUD', 'CAD', 'JPY', 'SGD', 'AED'];
+    const common = COMMON_CURRENCIES;
     return [...new Set([...used, this.rates.reportingCurrency(), ...common])].sort();
   });
 

@@ -34,8 +34,9 @@ Every task follows the same loop, and none of it is optional:
 | 9 | Assets and liabilities | ✅ Done |
 | 10 | Starter accounts | ✅ Done |
 | 11 | Categories and subcategories | ✅ Done |
+| 12 | The vault's currency | ✅ Done |
 
-Tests today: **874 client unit**, **93 end-to-end**, **95 Go**, **25 worker**.
+Tests today: **886 client unit**, **98 end-to-end**, **95 Go**, **25 worker**.
 
 ---
 
