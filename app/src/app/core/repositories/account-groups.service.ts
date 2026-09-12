@@ -4,6 +4,7 @@ import { liveQuery } from 'dexie';
 import { from } from 'rxjs';
 import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
+import { sideOf } from '../accounts/classification';
 import { Account, AccountGroup, AccountGroupType } from '../models/domain';
 import { AccountsService } from './accounts.service';
 import { LedgerService } from './ledger.service';
@@ -62,6 +63,11 @@ export class AccountGroupsService {
 
   isCreditCard(account: Account): boolean {
     return this.typeOf(account) === 'credit-card';
+  }
+
+  /** Whether this account is money owed rather than money held. */
+  isLiability(account: Account): boolean {
+    return sideOf(account, this.byId(account.groupId)) === 'liability';
   }
 
   /** The accounts filed in a group, in the order the accounts list uses. */

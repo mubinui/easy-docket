@@ -1,5 +1,6 @@
 import { convert, sameCurrency } from '../money/conversion';
 import { Account, AccountGroup, Minor } from '../models/domain';
+import { BalanceSheetSide, readsAsOwed, sideOfType } from './classification';
 import { countsInTotals } from './totals';
 
 /**
@@ -22,6 +23,8 @@ export interface AccountSection {
   subtotal: Minor;
   /** True when `subtotal` means "owed" rather than "held". */
   owed: boolean;
+  /** Which half of the balance sheet this section belongs to. */
+  side: BalanceSheetSide;
   /** Currencies left out of `subtotal` because no rate is known. */
   unconverted: string[];
   /** Accounts in this section the user has excluded from totals. */
@@ -81,18 +84,21 @@ export function buildSections(input: SectionInput): AccountSection[] {
     // money", and a heading with nothing under it answers nothing. The group
     // still exists and is managed on its own screen.
     if (!inGroup.length) continue;
-    sections.push(sectionFor(group, inGroup, group.type === 'credit-card'));
+    sections.push(sectionFor(group, inGroup, sideOfType(group.type)));
   }
 
-  if (ungrouped.length) sections.push(sectionFor(null, ungrouped, false));
+  // Ungrouped accounts are assets: see `sideOf` for why that is the safe way
+  // round to be wrong.
+  if (ungrouped.length) sections.push(sectionFor(null, ungrouped, 'asset'));
 
   return sections;
 
   function sectionFor(
     group: AccountGroup | null,
     inSection: Account[],
-    owed: boolean,
+    side: BalanceSheetSide,
   ): AccountSection {
+    const owed = group ? readsAsOwed(group.type) : false;
     let total = 0;
     let excluded = 0;
     const missing: string[] = [];
@@ -128,8 +134,35 @@ export function buildSections(input: SectionInput): AccountSection[] {
       accounts: inSection,
       subtotal: displayBalance(total, owed),
       owed,
+      side,
       unconverted: [...new Set(missing)],
       excluded,
     };
   }
+}
+
+/**
+ * The balance sheet: what is held, what is owed, and the difference.
+ *
+ * `liabilities` is a positive number standing for a debt, matching how the
+ * sections read. `net` is assets minus liabilities, which is the same figure
+ * net worth has always shown — presenting the two halves does not change the
+ * arithmetic, it explains it.
+ */
+export interface BalanceSheet {
+  assets: Minor;
+  liabilities: Minor;
+  net: Minor;
+}
+
+export function balanceSheet(sections: readonly AccountSection[]): BalanceSheet {
+  let assets = 0;
+  let liabilities = 0;
+
+  for (const section of sections) {
+    if (section.side === 'liability') liabilities += section.subtotal;
+    else assets += section.subtotal;
+  }
+
+  return { assets, liabilities, net: assets - liabilities };
 }

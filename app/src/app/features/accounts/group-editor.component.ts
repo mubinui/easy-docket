@@ -36,19 +36,25 @@ export const GROUP_TYPES: ReadonlyArray<{
     value: 'default',
     label: 'Default',
     icon: 'folder-outline',
-    note: 'Ordinary accounts. Balances read as money you hold.',
+    note: 'Ordinary accounts. Balances read as money you hold, and count as assets.',
   },
   {
     value: 'credit-card',
     label: 'Credit card',
     icon: 'card-outline',
-    note: 'Balances read as money owed, and these accounts can have a bill paid.',
+    note: 'Balances read as money owed and count as liabilities; a bill can be paid.',
   },
   {
     value: 'debit-card',
     label: 'Debit card',
     icon: 'card-outline',
     note: 'Cards drawing on money you already hold. Balances read as normal.',
+  },
+  {
+    value: 'loan',
+    label: 'Loan',
+    icon: 'trending-down-outline',
+    note: 'Money borrowed — a mortgage, a car loan. Counts as a liability, like a credit card.',
   },
 ];
 

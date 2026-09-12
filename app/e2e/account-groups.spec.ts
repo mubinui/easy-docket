@@ -281,4 +281,59 @@ test.describe('account groups', () => {
       page.locator(Screen.accounts).getByRole('button', { name: 'Pay Visa bill', exact: true }),
     ).toHaveCount(0);
   });
+
+  test('credit and loans show as liabilities, cash as assets', async ({ page }) => {
+    await openGroups(page);
+    await addGroup(page, 'Credit cards', 'Credit card');
+    await addGroup(page, 'Loans', 'Loan');
+
+    await addFiledAccount(page, 'Visa', '-1240.00', 'Credit cards');
+    await addFiledAccount(page, 'Car loan', '-5000.00', 'Loans');
+    await addAccount(page, 'Current account', '10000.00');
+
+    const screen = page.locator(Screen.accounts);
+    await expect(screen).toContainText('Assets');
+    await expect(screen).toContainText('Liabilities');
+
+    // Both debts read as owed, and add up as one liability figure.
+    await expect(screen).toContainText('$6,240.00');
+    await expect(screen).toContainText('$10,000.00');
+
+    // Net worth is assets less liabilities, and is not restated by any of this.
+    await expect(screen).toContainText('$3,760.00');
+
+    // A loan is not a negative asset: it never shows as a minus.
+    await expect(screen).not.toContainText('\u2212$5,000.00');
+    await expect(screen).not.toContainText('-$5,000.00');
+
+    // Pay is a credit card flow; a loan repayment is recorded as a transfer.
+    await expect(screen.getByRole('button', { name: 'Pay Visa bill', exact: true })).toBeVisible();
+    await expect(
+      screen.getByRole('button', { name: 'Pay Car loan bill', exact: true }),
+    ).toHaveCount(0);
+  });
+
+  test('a loan is not offered as a way to pay a card', async ({ page }) => {
+    await openGroups(page);
+    await addGroup(page, 'Credit cards', 'Credit card');
+    await addGroup(page, 'Loans', 'Loan');
+
+    await addFiledAccount(page, 'Visa', '-100.00', 'Credit cards');
+    await addFiledAccount(page, 'Car loan', '-5000.00', 'Loans');
+    await addAccount(page, 'Current account', '1000.00');
+
+    await page
+      .locator(Screen.accounts)
+      .getByRole('button', { name: 'Pay Visa bill', exact: true })
+      .click();
+    const sheet = page.locator('ion-modal.show-modal');
+    await expect(sheet).toBeVisible();
+
+    // Open the funding picker and see what it offers.
+    await sheet.locator('ion-select').click();
+    const options = page.locator('ion-alert');
+    await expect(options).toBeVisible();
+    await expect(options).toContainText('Current account');
+    await expect(options).not.toContainText('Car loan');
+  });
 });

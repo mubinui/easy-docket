@@ -270,4 +270,83 @@ describe('AccountsPage grouping', () => {
       expect(page.subtitle(section.accounts[0], section)).toBe('bank');
     });
   });
+
+  describe('the balance sheet', () => {
+    async function mixedLedger(): Promise<void> {
+      await db.accountGroups.bulkPut([
+        anAccountGroup({ id: 'g-day', name: 'Everyday', type: 'default', order: 0 }),
+        anAccountGroup({ id: 'g-cards', name: 'Cards', type: 'credit-card', order: 1 }),
+        anAccountGroup({ id: 'g-loans', name: 'Loans', type: 'loan', order: 2 }),
+      ]);
+      await db.accounts.bulkPut([
+        anAccount({ id: 'a-cash', name: 'Current', groupId: 'g-day', openingBalance: 10_000_00 }),
+        anAccount({ id: 'a-visa', name: 'Visa', groupId: 'g-cards', openingBalance: -1_240_00 }),
+        anAccount({ id: 'a-loan', name: 'Car loan', groupId: 'g-loans', openingBalance: -5_000_00 }),
+      ]);
+      await render(3, 3);
+      await waitUntil(() => page.sections().length === 3);
+      fixture.detectChanges();
+    }
+
+    it('splits the sections into what is held and what is owed', async () => {
+      await mixedLedger();
+
+      const [assets, liabilities] = page.halves();
+      expect(assets.sections.map((s) => s.group?.name)).toEqual(['Everyday']);
+      expect(liabilities.sections.map((s) => s.group?.name)).toEqual(['Cards', 'Loans']);
+    });
+
+    it('totals each half, with debts as positive amounts', async () => {
+      await mixedLedger();
+
+      expect(page.sheet().assets).toBe(10_000_00);
+      expect(page.sheet().liabilities).toBe(6_240_00);
+    });
+
+    it('nets to the same figure net worth already showed', async () => {
+      await mixedLedger();
+      await waitUntil(() => page.accounts.netWorth() === 3_760_00);
+
+      expect(page.sheet().net).toBe(page.accounts.netWorth());
+    });
+
+    it('puts both halves on screen, named', async () => {
+      await mixedLedger();
+
+      expect(text()).toContain('Assets');
+      expect(text()).toContain('Liabilities');
+      expect(text()).toContain('Car loan');
+    });
+
+    it('reads a loan as money owed', async () => {
+      await mixedLedger();
+
+      const loans = page.halves()[1].sections.find((s) => s.group?.name === 'Loans')!;
+      expect(loans.owed).toBe(true);
+      expect(page.shown(loans.accounts[0], loans)).toBe(5_000_00);
+      expect(page.alarming(loans.accounts[0], loans)).toBe(false);
+    });
+
+    it('offers Pay on a card but not on a loan', async () => {
+      // A loan is a liability shown as owed, but the payment sheet is written
+      // about a card's statement and bill.
+      await mixedLedger();
+
+      const [, liabilities] = page.halves();
+      const cards = liabilities.sections.find((s) => s.group?.name === 'Cards')!;
+      const loans = liabilities.sections.find((s) => s.group?.name === 'Loans')!;
+
+      expect(page.payable(cards.accounts[0], cards)).toBe(true);
+      expect(page.payable(loans.accounts[0], loans)).toBe(false);
+    });
+
+    it('shows no liabilities half when nothing is owed', async () => {
+      await db.accounts.put(anAccount({ id: 'a-1', groupId: null, openingBalance: 500_00 }));
+      await render(1);
+      await waitUntil(() => page.sections().length === 1);
+
+      expect(page.halves()[1].sections).toEqual([]);
+      expect(page.sheet().liabilities).toBe(0);
+    });
+  });
 });

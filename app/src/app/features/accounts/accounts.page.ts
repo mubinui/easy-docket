@@ -11,7 +11,12 @@ import {
   trendingUpOutline,
   walletOutline,
 } from 'ionicons/icons';
-import { AccountSection, buildSections, displayBalance } from '../../core/accounts/sections';
+import {
+  AccountSection,
+  balanceSheet,
+  buildSections,
+  displayBalance,
+} from '../../core/accounts/sections';
 import { countsInTotals } from '../../core/accounts/totals';
 import { availableCredit, dueDateFor, hasCycle, lastStatementDate } from '../../core/cards/statement';
 import { Account } from '../../core/models/domain';
@@ -66,6 +71,26 @@ import {
       .warning {
         padding: 0 1rem 0.75rem;
       }
+      .sheet {
+        display: flex;
+        gap: 1.5rem;
+        padding: 0 1rem 0.75rem;
+      }
+      .sheet span {
+        display: flex;
+        flex-direction: column;
+      }
+      .sheet strong.owing {
+        color: var(--ion-color-danger);
+      }
+      .side {
+        display: flex;
+        justify-content: space-between;
+        padding: 1rem 1rem 0.25rem;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.04em;
+      }
     `,
   ],
   template: `
@@ -87,6 +112,23 @@ import {
           <ion-note>Net worth</ion-note>
           <strong>{{ accounts.netWorth() | money: reportingCurrency() }}</strong>
         </div>
+        <!--
+          Assets and liabilities are not new arithmetic: net worth has always
+          been the difference between them. Showing both explains the figure
+          above rather than adding to it.
+        -->
+        <div class="sheet">
+          <span>
+            <ion-note>Assets</ion-note>
+            <strong>{{ sheet().assets | money: reportingCurrency() }}</strong>
+          </span>
+          <span>
+            <ion-note>Liabilities</ion-note>
+            <strong [class.owing]="sheet().liabilities > 0">
+              {{ sheet().liabilities | money: reportingCurrency() }}
+            </strong>
+          </span>
+        </div>
         @if (unconverted().length) {
           <div class="warning">
             <ion-note color="warning">
@@ -103,7 +145,15 @@ import {
           </div>
         }
 
-        @for (section of sections(); track section.group?.id ?? 'ungrouped') {
+        @for (half of halves(); track half.side) {
+          @if (half.sections.length) {
+            <div class="side">
+              <ion-note>{{ half.side === 'asset' ? 'Assets' : 'Liabilities' }}</ion-note>
+              <ion-note>{{ half.total | money: reportingCurrency() }}</ion-note>
+            </div>
+          }
+
+          @for (section of half.sections; track section.group?.id ?? 'ungrouped') {
           <ion-list>
             <ion-item-divider>
               <ion-label>{{ section.group?.name ?? 'Not in a group' }}</ion-label>
@@ -163,6 +213,7 @@ import {
               </ion-item>
             }
           </ion-list>
+          }
         }
       } @else {
         <div class="empty">
@@ -248,6 +299,28 @@ export class AccountsPage {
     }),
   );
 
+  readonly sheet = computed(() => balanceSheet(this.sections()));
+
+  /**
+   * The sections split into the two halves of the balance sheet, each with its
+   * own total. Rendered in order: what is held, then what is owed.
+   */
+  readonly halves = computed(() => {
+    const sheet = this.sheet();
+    return [
+      {
+        side: 'asset' as const,
+        total: sheet.assets,
+        sections: this.sections().filter((section) => section.side === 'asset'),
+      },
+      {
+        side: 'liability' as const,
+        total: sheet.liabilities,
+        sections: this.sections().filter((section) => section.side === 'liability'),
+      },
+    ];
+  });
+
   readonly editorOpen = signal(false);
   readonly editing = signal<Account | null>(null);
   readonly paying = signal<Account | null>(null);
@@ -285,9 +358,16 @@ export class AccountsPage {
     return parts.length ? parts.join(' · ') : account.kind;
   }
 
-  /** Whether this row offers a payment: a card with something on it. */
+  /**
+   * Whether this row offers a payment.
+   *
+   * Credit cards only, even though a loan is also a liability shown as owed.
+   * The payment sheet is written about a card — its statement, its bill — and
+   * offering it for a loan would present a flow nobody designed for repayments.
+   * Recording one by hand as a transfer works exactly as it always did.
+   */
   payable(account: Account, section: AccountSection): boolean {
-    return section.owed && this.balanceOf(account) < 0;
+    return section.owed && this.balanceOf(account) < 0 && this.groups.isCreditCard(account);
   }
 
   /**

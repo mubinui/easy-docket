@@ -31,8 +31,9 @@ Every task follows the same loop, and none of it is optional:
 | 6 | Release readiness | ✅ Done |
 | 7 | Account groups & credit cards | ✅ Done |
 | 8 | Accounts in totals | ✅ Done |
+| 9 | Assets and liabilities | ✅ Done |
 
-Tests today: **760 client unit**, **80 end-to-end**, **95 Go**.
+Tests today: **785 client unit**, **82 end-to-end**, **95 Go**.
 
 ---
 
@@ -1044,6 +1045,7 @@ Real, currently unaddressed, and each one has a home above.
 | `remove` is unproven against S3 and Git | Pruning is covered against the Go server and by unit tests, but the S3 and Git delete paths have not run against a real remote | Open. Needs a snapshot to trigger, which needs 200 operations — worth a seeded fixture rather than driving the UI |
 | ~~A deleted transaction can come back if the app reloads immediately after~~ | — | ✅ Closed. **It was the test, not the app** — see "The flaky delete" below |
 | The accounts list shows `kind` as its stored value | Cosmetic: a row reads "bank" rather than "Bank account" | Open, small. Now that `AccountKind` is documented as presentation, showing the raw enum is the one place that still contradicts it — the label belongs beside the icon it already picks |
+| A loan has no "Pay" flow | A repayment is recorded by hand as a transfer, which works but is more typing | Open. The payment sheet is card-shaped ("statement balance", "bill"); generalising it to repayments is a small, deliberate piece of work |
 | No rate limiting on the server | A leaked token can be used to exhaust disk | Server hardening, unscheduled — quotas blunt it today |
 | Single currency assumed in UI totals | Dashboard uses the first account's currency | Phase 5 |
 | Category deletion leaves transactions uncategorised | Silent, no warning | Small fix, fold into 2.3 |
@@ -1118,6 +1120,71 @@ outside, in the terms someone would actually ask the question.
 the statement closes is on that same statement, so the statement closes at
 nothing owed rather than showing the purchase. Both arrangements — paid before
 the close, and paid after it — now have a test.
+
+---
+
+## Phase 9 — Assets and liabilities
+
+Credit card balances and loans are money **owed**, and the accounts screen now
+says so: two halves, each totalled, with net worth explained as the difference
+rather than merely asserted.
+
+### 9.1 A loan is a group type ✅
+
+- [x] `'loan'` added to `AccountGroupType`, with its own label, icon and note
+- [x] `core/accounts/classification.ts` — `sideOfType`, `sideOf`, `readsAsOwed`
+- [x] `AccountGroupsService.isLiability`
+
+### 9.2 The balance sheet ✅
+
+- [x] `AccountSection.side`, and `balanceSheet(sections)` → assets, liabilities, net
+- [x] Accounts screen renders **Assets** then **Liabilities**, each with a total,
+      groups nested underneath
+- [x] Headline carries both figures beside net worth; liabilities in danger
+      colour when there is a debt
+- [x] Summary's net worth card reads "$14,200.00 held less $6,240.00 owed", only
+      once something is owed
+- [x] A loan reads as owed, exactly like a card
+- [x] Liability accounts are not offered as a way to pay a card bill
+
+**Tests** (25 added, 760 → 785; plus 2 end-to-end, 80 → 82)
+- [x] Unit (classification): cards and loans are liabilities, ordinary and debit
+      groups are not, ungrouped is an asset, `kind` has no say, and `readsAsOwed`
+      is checked to be *exactly* the liability set so the two cannot disagree
+- [x] Unit (sections): sides assigned, a loan read as owed, an overdrawn ordinary
+      account staying an asset, and `balanceSheet` totalling each side, netting
+      to the existing net worth figure, handling an empty ledger, a cleared card,
+      and accounts excluded from totals
+- [x] Component: the split, the totals, the net matching net worth, both halves
+      named on screen, a loan shown as owed and not coloured, no liabilities half
+      when nothing is owed, and Pay offered on a card but not a loan
+- [x] e2e: cards and loans under Liabilities with cash under Assets, no minus
+      signs on a debt, net worth unrestated, and a loan absent from the funding
+      picker
+
+**Classification is by what an account is, not by its balance.** A current
+account overdrawn this week is an asset that happens to be negative; it does not
+become a loan. A credit card paid off to zero is still a liability with nothing
+on it. Classifying by balance would shuffle accounts between the two halves as
+money came and went, which is not what a balance sheet does.
+
+**Ungrouped is an asset, deliberately.** A balance appearing under "held" when
+it should have been "owed" is visible and correctable; the reverse would quietly
+overstate someone's debts.
+
+**`readsAsOwed` is defined as the liability set, not alongside it.** The moment
+"shows as owed" and "counts as a liability" could be edited apart, one of the
+two screens would be lying. A test asserts they agree for every type.
+
+**Net worth is unchanged.** It was always assets minus liabilities; showing both
+halves explains the figure rather than restating it, and a test pins the two
+together.
+
+**What this deliberately did not add.** A loan is a liability shown as owed, but
+it gets no Pay button: that sheet is written about a card's statement and bill,
+and offering it for a loan would present a flow nobody designed for repayments.
+Recording a repayment by hand as a transfer works exactly as it always did.
+Generalising the sheet to loan repayments is a real follow-up, not a side effect.
 
 ---
 

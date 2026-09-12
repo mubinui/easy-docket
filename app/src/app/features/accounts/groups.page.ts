@@ -21,7 +21,7 @@ import {
   ItemReorderEventDetail,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { addOutline, cardOutline, folderOutline } from 'ionicons/icons';
+import { addOutline, cardOutline, folderOutline, trendingDownOutline } from 'ionicons/icons';
 import { AccountGroup } from '../../core/models/domain';
 import { AccountGroupsService } from '../../core/repositories/account-groups.service';
 import { GROUP_TYPES, GroupEditorComponent } from './group-editor.component';
@@ -189,6 +189,6 @@ export class AccountGroupsPage {
   }
 
   constructor() {
-    addIcons({ addOutline, cardOutline, folderOutline });
+    addIcons({ addOutline, cardOutline, folderOutline, trendingDownOutline });
   }
 }

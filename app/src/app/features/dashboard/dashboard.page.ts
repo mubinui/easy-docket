@@ -7,6 +7,8 @@ import {
   chevronForwardOutline,
   cloudOfflineOutline,
 } from 'ionicons/icons';
+import { balanceSheet, buildSections } from '../../core/accounts/sections';
+import { AccountGroupsService } from '../../core/repositories/account-groups.service';
 import { CardBillsService } from '../../core/cards/card-bills.service';
 import { daysBetween } from '../../core/cards/statement';
 import { toIsoDate } from '../../core/util/dates';
@@ -112,7 +114,17 @@ import {
         </ion-card-header>
         <ion-card-content>
           <p class="net-worth">{{ accounts.netWorth() | money: currency() }}</p>
-          <ion-note>across {{ accounts.active().length }} account(s)</ion-note>
+          <ion-note>across {{ accounts.counted().length }} account(s)</ion-note>
+
+          @if (sheet().liabilities !== 0) {
+            <!-- Only worth the space once something is owed. -->
+            <p>
+              <ion-note>
+                {{ sheet().assets | money: currency() }} held less
+                {{ sheet().liabilities | money: currency() }} owed
+              </ion-note>
+            </p>
+          }
 
           @if (unconvertedAccounts().length) {
             <!-- Never a silently short total: say which currencies are missing. -->
@@ -304,6 +316,7 @@ export class DashboardPage {
   readonly transactions = inject(TransactionsService);
   readonly budgets = inject(BudgetsService);
   readonly cards = inject(CardBillsService);
+  private readonly groups = inject(AccountGroupsService);
   readonly rates = inject(RatesService);
   private readonly scheduler = inject(SyncSchedulerService);
 
@@ -312,6 +325,19 @@ export class DashboardPage {
   readonly currency = computed(() => this.rates.reportingCurrency());
 
   readonly unconvertedAccounts = computed(() => this.accounts.netWorthDetail().unconverted);
+
+  /** The balance sheet behind the headline: what is held, what is owed. */
+  readonly sheet = computed(() =>
+    balanceSheet(
+      buildSections({
+        accounts: this.accounts.active(),
+        groups: this.groups.active(),
+        balances: this.accounts.balances(),
+        reporting: this.currency(),
+        rateFor: (code) => this.rates.rateToReporting(code),
+      }),
+    ),
+  );
 
   readonly recent = computed(() => this.transactions.visible().slice(0, 5));
 

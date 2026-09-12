@@ -164,9 +164,10 @@ export class PayBillComponent {
   /**
    * Accounts a payment could come from.
    *
-   * Not the card itself, not another credit card — paying a card with a card is
-   * not something this app models — and only accounts sharing the card's
-   * currency, because a transfer carries a single amount.
+   * Not the card itself, and nothing else on the liability side of the balance
+   * sheet: paying a card with another card, or out of a loan, is not something
+   * this app models. Only accounts sharing the card's currency, because a
+   * transfer carries a single amount.
    */
   readonly fundingAccounts = computed(() => {
     const card = this.card();
@@ -176,7 +177,7 @@ export class PayBillComponent {
       .filter(
         (account) =>
           account.id !== card.id &&
-          !this.groups.isCreditCard(account) &&
+          !this.groups.isLiability(account) &&
           account.currency.toUpperCase() === card.currency.toUpperCase(),
       );
   });

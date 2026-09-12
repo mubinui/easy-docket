@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { anAccount, anAccountGroup } from '../testing/factories';
-import { AccountSection, buildSections, displayBalance } from './sections';
+import { AccountSection, balanceSheet, buildSections, displayBalance } from './sections';
 
 /** A rate table stated as "one unit of X buys this many USD". */
 function rates(table: Record<string, number>) {
@@ -295,6 +295,147 @@ describe('buildSections', () => {
       );
 
       expect(result[0].subtotal).toBe(100_00);
+    });
+  });
+
+  describe('which side of the balance sheet', () => {
+    it('puts ordinary and debit-card groups on the asset side', () => {
+      const result = sections(
+        [
+          anAccount({ id: 'a-1', groupId: 'g-day' }),
+          anAccount({ id: 'a-2', groupId: 'g-debit' }),
+        ],
+        [
+          anAccountGroup({ id: 'g-day', name: 'Everyday', type: 'default', order: 0 }),
+          anAccountGroup({ id: 'g-debit', name: 'Travel', type: 'debit-card', order: 1 }),
+        ],
+        { 'a-1': 100_00, 'a-2': 50_00 },
+      );
+
+      expect(result.map((s) => s.side)).toEqual(['asset', 'asset']);
+    });
+
+    it('puts credit cards and loans on the liability side', () => {
+      const result = sections(
+        [
+          anAccount({ id: 'a-visa', groupId: 'g-cards' }),
+          anAccount({ id: 'a-mortgage', groupId: 'g-loans' }),
+        ],
+        [
+          anAccountGroup({ id: 'g-cards', name: 'Cards', type: 'credit-card', order: 0 }),
+          anAccountGroup({ id: 'g-loans', name: 'Loans', type: 'loan', order: 1 }),
+        ],
+        { 'a-visa': -1_240_00, 'a-mortgage': -180_000_00 },
+      );
+
+      expect(result.map((s) => s.side)).toEqual(['liability', 'liability']);
+    });
+
+    it('reads a loan as an amount owed, like a card', () => {
+      const result = sections(
+        [anAccount({ id: 'a-mortgage', groupId: 'g-loans' })],
+        [anAccountGroup({ id: 'g-loans', type: 'loan' })],
+        { 'a-mortgage': -180_000_00 },
+      );
+
+      expect(result[0].owed).toBe(true);
+      expect(result[0].subtotal).toBe(180_000_00);
+    });
+
+    it('puts ungrouped accounts on the asset side', () => {
+      const result = sections([anAccount({ id: 'a-1', groupId: null })], [], { 'a-1': 60_00 });
+      expect(result[0].side).toBe('asset');
+    });
+
+    it('does not move an overdrawn ordinary account to liabilities', () => {
+      // An asset that happens to be negative is still an asset.
+      const result = sections(
+        [anAccount({ id: 'a-1', groupId: 'g-day' })],
+        [anAccountGroup({ id: 'g-day', type: 'default' })],
+        { 'a-1': -25_00 },
+      );
+
+      expect(result[0].side).toBe('asset');
+      expect(result[0].subtotal).toBe(-25_00);
+    });
+  });
+
+  describe('balanceSheet', () => {
+    function mixed() {
+      return sections(
+        [
+          anAccount({ id: 'a-cash', groupId: 'g-day' }),
+          anAccount({ id: 'a-visa', groupId: 'g-cards' }),
+          anAccount({ id: 'a-loan', groupId: 'g-loans' }),
+        ],
+        [
+          anAccountGroup({ id: 'g-day', type: 'default', order: 0 }),
+          anAccountGroup({ id: 'g-cards', type: 'credit-card', order: 1 }),
+          anAccountGroup({ id: 'g-loans', type: 'loan', order: 2 }),
+        ],
+        { 'a-cash': 10_000_00, 'a-visa': -1_240_00, 'a-loan': -5_000_00 },
+      );
+    }
+
+    it('adds each side up separately', () => {
+      const sheet = balanceSheet(mixed());
+
+      expect(sheet.assets).toBe(10_000_00);
+      // Liabilities are positive: a debt of 6,240, not a balance of −6,240.
+      expect(sheet.liabilities).toBe(6_240_00);
+    });
+
+    it('nets to the figure net worth has always shown', () => {
+      const sheet = balanceSheet(mixed());
+      expect(sheet.net).toBe(10_000_00 - 6_240_00);
+    });
+
+    it('is all zeroes for an empty ledger', () => {
+      expect(balanceSheet([])).toEqual({ assets: 0, liabilities: 0, net: 0 });
+    });
+
+    it('reports no liabilities when nothing is owed', () => {
+      const sheet = balanceSheet(
+        sections(
+          [anAccount({ id: 'a-1', groupId: null })],
+          [],
+          { 'a-1': 500_00 },
+        ),
+      );
+
+      expect(sheet).toEqual({ assets: 500_00, liabilities: 0, net: 500_00 });
+    });
+
+    it('leaves a cleared card on the liability side, at nothing', () => {
+      const sheet = balanceSheet(
+        sections(
+          [anAccount({ id: 'a-visa', groupId: 'g-cards' })],
+          [anAccountGroup({ id: 'g-cards', type: 'credit-card' })],
+          { 'a-visa': 0 },
+        ),
+      );
+
+      expect(sheet.liabilities).toBe(0);
+      expect(sheet.assets).toBe(0);
+    });
+
+    it('ignores accounts the user left out of totals', () => {
+      const sheet = balanceSheet(
+        sections(
+          [
+            anAccount({ id: 'a-1', groupId: 'g-day' }),
+            anAccount({ id: 'a-loan', groupId: 'g-loans', excludedFromTotals: true }),
+          ],
+          [
+            anAccountGroup({ id: 'g-day', type: 'default', order: 0 }),
+            anAccountGroup({ id: 'g-loans', type: 'loan', order: 1 }),
+          ],
+          { 'a-1': 100_00, 'a-loan': -900_00 },
+        ),
+      );
+
+      expect(sheet.assets).toBe(100_00);
+      expect(sheet.liabilities).toBe(0);
     });
   });
 });

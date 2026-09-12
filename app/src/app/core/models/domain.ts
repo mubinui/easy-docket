@@ -29,8 +29,12 @@ export type AccountKind = 'cash' | 'bank' | 'card' | 'wallet' | 'savings' | 'inv
  * The type sits on the group rather than on each account so that "these are my
  * credit cards" is recorded once. Putting it on the account would repeat the
  * same fact once per card, and repeated facts drift.
+ *
+ * It also decides which side of the balance sheet an account falls on: a credit
+ * card and a loan are money owed, everything else is money held. See
+ * `core/accounts/classification.ts`.
  */
-export type AccountGroupType = 'default' | 'credit-card' | 'debit-card';
+export type AccountGroupType = 'default' | 'credit-card' | 'debit-card' | 'loan';
 
 /**
  * A named set of accounts — "Cards", "Joint", "Savings" — with a type.
