@@ -6,6 +6,7 @@ import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { CategoryNode, buildTree, compareCategories, descendantIds } from '../categories/tree';
 import { Category, CategoryKind } from '../models/domain';
+import { DEFAULT_REPORTING_CURRENCY } from './rates.service';
 import { LedgerService } from './ledger.service';
 
 /** The categories a new vault starts with, so the first transaction is one tap. */
@@ -37,6 +38,39 @@ export class CategoriesService {
   });
 
   readonly active = computed(() => this.all().filter((category) => !category.archived));
+
+  private readonly settings = toSignal(from(liveQuery(() => this.db.vaultSettings.get('vault'))), {
+    initialValue: undefined,
+  });
+
+  /**
+   * Whether the second level is offered at all.
+   *
+   * Vault-wide, so two devices agree about how deep the list goes, and on by
+   * default — a vault written before the setting existed keeps behaving the way
+   * it did.
+   */
+  readonly subcategoriesEnabled = computed(() => this.settings()?.subcategories !== false);
+
+  /**
+   * Turn the second level on or off.
+   *
+   * Nothing is deleted either way. Subcategories stay in the ledger and the
+   * transactions filed against them keep counting towards their parent; they
+   * simply stop being offered. Turning a display preference into a data
+   * migration would be a cruel thing to do to someone who wanted a shorter list.
+   */
+  async setSubcategoriesEnabled(enabled: boolean): Promise<void> {
+    const existing = await this.db.vaultSettings.get('vault');
+    await this.ledger.put('vaultSettings', {
+      reportingCurrency: DEFAULT_REPORTING_CURRENCY,
+      ...existing,
+      id: 'vault',
+      subcategories: enabled,
+      createdAt: existing?.createdAt ?? Date.now(),
+      updatedAt: '',
+    });
+  }
   readonly income = computed(() => this.active().filter((c) => c.kind === 'income'));
   readonly expense = computed(() => this.active().filter((c) => c.kind === 'expense'));
 

@@ -82,6 +82,14 @@ export const routes: Routes = [
       import('./features/settings/sync-settings.page').then((m) => m.SyncSettingsPage),
   },
   {
+    // One screen, two kinds. Income and expense are never compared or moved
+    // between, so they get a route each rather than a segment.
+    path: 'settings/categories/:kind',
+    canActivate: [vaultGuard],
+    loadComponent: () =>
+      import('./features/categories/categories.page').then((m) => m.CategoriesPage),
+  },
+  {
     path: 'settings/totals',
     canActivate: [vaultGuard],
     loadComponent: () =>

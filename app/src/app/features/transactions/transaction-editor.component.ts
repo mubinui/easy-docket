@@ -12,6 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { Transaction, TransactionKind } from '../../core/models/domain';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
+import { CategoryPickerComponent } from '../categories/category-picker.component';
 import { RatesService } from '../../core/repositories/rates.service';
 import { TransactionsService } from '../../core/repositories/transactions.service';
 import { toIsoDate } from '../../core/util/dates';
@@ -26,6 +27,7 @@ import {
   IonInput,
   IonItem,
   IonLabel,
+  IonModal,
   IonList,
   IonSegment,
   IonSegmentButton,
@@ -48,7 +50,7 @@ import {
 @Component({
   selector: 'app-transaction-editor',
   standalone: true,
-  imports: [FormsModule, IonButton, IonButtons, IonContent, IonHeader, IonInput, IonItem, IonLabel, IonList, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonText, IonTitle, IonToggle, IonToolbar, IonNote],
+  imports: [CategoryPickerComponent, FormsModule, IonButton, IonButtons, IonContent, IonHeader, IonInput, IonItem, IonLabel, IonList, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonText, IonTitle, IonToggle, IonToolbar, IonNote, IonModal],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -111,17 +113,17 @@ import {
             </ion-select>
           </ion-item>
         } @else {
-          <ion-item>
-            <ion-select
-              label="Category"
-              labelPlacement="stacked"
-              [ngModel]="categoryId()"
-              (ngModelChange)="categoryId.set($event)"
-            >
-              @for (category of categoryOptions(); track category.id) {
-                <ion-select-option [value]="category.id">{{ category.name }}</ion-select-option>
-              }
-            </ion-select>
+          <!--
+            A button into a grid rather than a select: a vault has dozens of
+            categories and a select walks them one at a time, which is slow for
+            the thing people do several times a day. It also has nowhere to put
+            a subcategory.
+          -->
+          <ion-item button detail="true" (click)="pickerOpen.set(true)">
+            <ion-label>
+              <p>Category</p>
+              <h3>{{ categoryLabel() }}</h3>
+            </ion-label>
           </ion-item>
         }
 
@@ -189,6 +191,17 @@ import {
         }
       </ion-list>
 
+      <ion-modal [isOpen]="pickerOpen()" (didDismiss)="pickerOpen.set(false)">
+        <ng-template>
+          <app-category-picker
+            [kind]="kind() === 'income' ? 'income' : 'expense'"
+            [selected]="categoryId()"
+            (picked)="categoryId.set($event)"
+            (dismissed)="pickerOpen.set(false)"
+          />
+        </ng-template>
+      </ion-modal>
+
       @if (error()) {
         <ion-item lines="none">
           <ion-text color="danger"><small>{{ error() }}</small></ion-text>
@@ -221,6 +234,12 @@ export class TransactionEditorComponent {
   readonly accountId = signal<string | null>(null);
   readonly counterAccountId = signal<string | null>(null);
   readonly categoryId = signal<string | null>(null);
+  readonly pickerOpen = signal(false);
+
+  /** "Food › Lunch", or an invitation when nothing is chosen yet. */
+  readonly categoryLabel = computed(
+    () => this.categories.pathOf(this.categoryId()) || 'Choose a category',
+  );
   readonly payee = signal('');
   readonly note = signal('');
   readonly date = signal(toIsoDate());

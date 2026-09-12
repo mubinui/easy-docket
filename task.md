@@ -33,9 +33,9 @@ Every task follows the same loop, and none of it is optional:
 | 8 | Accounts in totals | ✅ Done |
 | 9 | Assets and liabilities | ✅ Done |
 | 10 | Starter accounts | ✅ Done |
-| 11 | Categories and subcategories | ⏳ In progress |
+| 11 | Categories and subcategories | ✅ Done |
 
-Tests today: **849 client unit**, **84 end-to-end**, **95 Go**, **25 worker**.
+Tests today: **871 client unit**, **91 end-to-end**, **95 Go**, **25 worker**.
 
 ---
 
@@ -1250,21 +1250,54 @@ report splits one category into several rows, neither of which announces itself.
 Lunch without the expansion — because that is the assumption a reader would
 otherwise carry.
 
-### 11.2 Managing them
+### 11.2 Managing them ✅
 
-- [ ] Settings → **Income categories** and **Expense categories**
-- [ ] Each lists its categories by name: how many subcategories, the first few
-      named, edit, delete
-- [ ] A **Subcategories** switch, so the extra layer can be left alone entirely
-- [ ] The editor adds, renames and removes subcategories inline
+- [x] Settings → **Income categories** and **Expense categories**, a route each
+- [x] Each lists its categories by name with a subcategory count and the first
+      few named, and deletes with a warning that says what goes
+- [x] A **Subcategories** switch, vault-wide so two devices agree
+- [x] The editor adds, renames and removes subcategories inline
 
-### 11.3 Picking one
+### 11.3 Picking one ✅
 
-- [ ] The transaction editor picks a category from a grid rather than a select
-- [ ] A category with subcategories expands in place; choosing one files the
-      transaction under it
-- [ ] Choosing the parent itself stays possible — not everything has a
-      subcategory, and forcing one would make the quick path slower
+- [x] The transaction editor opens a grid rather than walking a select
+- [x] A category with subcategories expands in place; choosing one files the
+      transaction under it and closes
+- [x] Choosing the parent stays possible — plenty of spending is just
+      "Transport", and the tap that chooses it also opens its children
+- [x] The row reads "Groceries › Corner shop", so the choice is unambiguous
+
+**Tests** (22 added, 849 → 871; plus 7 end-to-end, 84 → 91)
+- [x] Component (picker): the grid's contents, choosing a parent opening its
+      children, staying open afterwards, closing when there is nothing beneath,
+      collapsing on a second tap, opening on an existing choice's parent, and
+      the switch hiding the second level
+- [x] Component (list): the kinds apart, counts and previews, the preview
+      trimming, the switch hiding without deleting, archived kept apart
+- [x] e2e: the two screens, adding a category, adding subcategories and seeing
+      them previewed, the switch, filing a transaction under a subcategory, the
+      full path on the row, subcategory spending appearing under its parent on
+      the summary, and the deletion warning naming what it takes
+
+**The switch hides, it does not delete.** Turning subcategories off leaves them
+in the ledger and leaves the transactions filed against them counting towards
+their parent. Turning a display preference into a data migration would be a
+cruel thing to do to someone who only wanted a shorter list.
+
+**Choosing a parent also opens it.** One tap does both, so the specific choice
+is a second tap rather than a different gesture, and a category with nothing
+underneath closes the sheet immediately.
+
+**What the grid is for.** A select walks thirty names one at a time, and has
+nowhere to put a second level. The grid puts a vault's categories on one screen,
+which matters for the thing people do several times a day.
+
+**One bug worth recording.** The picker collapsed the moment it expanded:
+choosing a parent emitted the id, which came straight back as `selected`, and an
+effect that set the expansion unconditionally read that category's null parent
+and closed what the tap had just opened. The effect now only ever opens. That is
+the fourth time a signal-reading effect has undone something the user just did —
+see the testing notes.
 
 ---
 

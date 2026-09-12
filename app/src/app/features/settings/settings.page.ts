@@ -5,16 +5,19 @@ import { addIcons } from 'ionicons';
 import {
   calculatorOutline,
   cloudOutline,
+  pricetagOutline,
   informationCircleOutline,
   lockClosedOutline,
   shieldOutline,
   documentTextOutline,
   swapHorizontalOutline,
+  trendingUpOutline,
 } from 'ionicons/icons';
 import { VaultService } from '../../core/keys/vault.service';
 import { SyncSettingsService } from '../../core/sync/sync-settings.service';
 import { SyncService } from '../../core/sync/sync.service';
 import { AccountsService } from '../../core/repositories/accounts.service';
+import { CategoriesService } from '../../core/repositories/categories.service';
 import { RatesService } from '../../core/repositories/rates.service';
 import { ThemeChoice, ThemeService } from '../../core/theme/theme.service';
 import {
@@ -93,6 +96,24 @@ import {
       </ion-list>
 
       <ion-list>
+        <ion-list-header><ion-label>Categories</ion-label></ion-list-header>
+        <ion-item button routerLink="/settings/categories/income" detail="true">
+          <ion-icon slot="start" name="trending-up-outline" />
+          <ion-label>
+            <h3>Income categories</h3>
+            <p>{{ categorySummary('income') }}</p>
+          </ion-label>
+        </ion-item>
+        <ion-item button routerLink="/settings/categories/expense" detail="true">
+          <ion-icon slot="start" name="pricetag-outline" />
+          <ion-label>
+            <h3>Expense categories</h3>
+            <p>{{ categorySummary('expense') }}</p>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+
+      <ion-list>
         <ion-list-header><ion-label>Totals</ion-label></ion-list-header>
         <ion-item button routerLink="/settings/totals" detail="true">
           <ion-icon slot="start" name="calculator-outline" />
@@ -135,10 +156,20 @@ export class SettingsPage {
   readonly theme = inject(ThemeService);
   readonly rates = inject(RatesService);
   readonly accounts = inject(AccountsService);
+  readonly categories = inject(CategoriesService);
   private readonly settings = inject(SyncSettingsService);
   private readonly sync = inject(SyncService);
   private readonly vault = inject(VaultService);
   private readonly router = inject(Router);
+
+  /** "8 categories, 12 subcategories" — enough to know without opening it. */
+  categorySummary(kind: 'income' | 'expense'): string {
+    const tree = this.categories.tree(kind);
+    const children = tree.reduce((sum, node) => sum + node.children.length, 0);
+    const parents = `${tree.length} categor${tree.length === 1 ? 'y' : 'ies'}`;
+    if (!children || !this.categories.subcategoriesEnabled()) return parents;
+    return `${parents}, ${children} subcategor${children === 1 ? 'y' : 'ies'}`;
+  }
 
   /** "All 4 accounts" or "3 of 4 accounts", so the state is visible without opening it. */
   readonly countedSummary = computed(() => {
@@ -192,6 +223,8 @@ export class SettingsPage {
       swapHorizontalOutline,
       documentTextOutline,
       calculatorOutline,
+      pricetagOutline,
+      trendingUpOutline,
     });
   }
 }

@@ -290,6 +290,21 @@ export interface VaultSettings {
   id: 'vault';
   /** The currency totals are expressed in. */
   reportingCurrency: string;
+
+  /**
+   * Whether categories may have subcategories.
+   *
+   * Off hides the second level everywhere rather than deleting it: the
+   * subcategories stay in the ledger and the transactions filed against them
+   * keep counting, they simply stop being offered. Turning a display preference
+   * into a data migration would be a cruel thing to do to someone who only
+   * wanted a shorter list.
+   *
+   * Optional: a vault written before this existed has none, and the default is
+   * on, so nothing about it changes until someone says otherwise.
+   */
+  subcategories?: boolean;
+
   createdAt: number;
   updatedAt: string;
 }

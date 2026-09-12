@@ -112,7 +112,11 @@ export class RatesService {
     assertCurrency(code);
 
     const existing = await this.db.vaultSettings.get('vault');
+    // Spread, not replace: there is one settings row and more than one thing
+    // written into it. Rebuilding it from scratch here would silently drop
+    // whatever else it holds.
     await this.ledger.put('vaultSettings', {
+      ...existing,
       id: 'vault',
       reportingCurrency: code,
       createdAt: existing?.createdAt ?? Date.now(),
