@@ -1,0 +1,17 @@
+{
+  "name": "easy-docket-cors-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker that lets a browser speak Git to hosts that send no CORS headers",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.11",
+    "wrangler": "^4.131.1"
+  }
+}

@@ -1,0 +1,16 @@
+name = "easy-docket-cors-proxy"
+main = "src/worker.js"
+compatibility_date = "2026-09-01"
+
+# Workers run ES modules directly, so there is no build step and nothing to
+# audit between the file you read and the code that runs.
+
+[vars]
+# Origins allowed to use the proxy. Empty means any origin, which is usually
+# what a worker on its own URL wants; naming your app is one line stricter.
+ALLOWED_ORIGINS = "https://docket.xiidea.net"
+
+# Upstream hosts the proxy will forward to. Unset means nothing is forwarded —
+# this fails closed on purpose, so a fresh deploy is never an open relay.
+# Subdomains of a listed host are allowed (`github.com` covers `www.github.com`).
+ALLOWED_HOSTS = "github.com"

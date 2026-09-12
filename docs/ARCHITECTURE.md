@@ -171,7 +171,7 @@ written once instead of three times.
 | --- | --- |
 | **Server** | The bundled Go service. Bearer token, paged listings, immutable objects. |
 | **S3** | Any S3-compatible store. Path-style addressing for R2 and MinIO. |
-| **Git** | `isomorphic-git` over an IndexedDB filesystem. One commit per sync. Needs a CORS proxy in the browser; not on Android. |
+| **Git** | `isomorphic-git` over an IndexedDB filesystem. One commit per sync. Needs a CORS proxy in the browser (one is included in `cors-proxy/` — see [CORS_PROXY.md](CORS_PROXY.md)); not on Android. |
 
 All three are loaded with dynamic `import()`. The S3 client (57 kB) and the Git
 implementation (67 kB) are most of what the app could possibly download, and

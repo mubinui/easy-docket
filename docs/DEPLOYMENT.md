@@ -265,6 +265,14 @@ through `git http-backend`, S3 through MinIO — so the protocol paths are
 checked, not assumed.
 
 For Git in the browser, a CORS proxy is required — most Git hosts send no CORS
-headers. The Android app does not need one. The proxy only ever relays
-encrypted data, but it does see the repository URL and token, so run your own
-if that matters.
+headers, and GitHub refuses the preflight that an authenticated request needs,
+so the request never leaves the browser. The Android app does not need one.
+
+A ready-made Cloudflare Worker is included in `cors-proxy/`; deploying it takes
+about five minutes and costs nothing on the free plan. See
+**[CORS_PROXY.md](CORS_PROXY.md)** for the deployment guide, what the proxy can
+and cannot see, and how to verify it.
+
+The proxy only ever relays encrypted data, but it does see the repository URL
+and the access token — which is why the guide is written around running your
+own rather than using a public one.

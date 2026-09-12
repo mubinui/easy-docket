@@ -38,6 +38,26 @@ jobs:
           path: app/www
           retention-days: 7
 
+  cors-proxy:
+    name: CORS proxy (Cloudflare Worker)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cors-proxy
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: cors-proxy/package-lock.json
+
+      - run: npm ci
+      # The worker is an allowlist with a fetch attached; the tests that matter
+      # are the ones asserting what it refuses to forward.
+      - run: npm test
+
   e2e:
     name: End-to-end (browser + sync server)
     runs-on: ubuntu-latest
