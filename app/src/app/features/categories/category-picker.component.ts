@@ -1,11 +1,12 @@
 import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { RouterLink } from '@angular/router';
+
 import {
   IonButton,
   IonButtons,
   IonContent,
   IonHeader,
   IonIcon,
+  IonModal,
   IonNote,
   IonTitle,
   IonToolbar,
@@ -15,6 +16,7 @@ import { chevronDownOutline, chevronUpOutline, closeOutline, createOutline } fro
 import { CategoryNode } from '../../core/categories/tree';
 import { Category, CategoryKind } from '../../core/models/domain';
 import { CategoriesService } from '../../core/repositories/categories.service';
+import { CategoriesPage } from './categories.page';
 
 /**
  * Choosing a category, as a grid rather than a list.
@@ -30,7 +32,7 @@ import { CategoriesService } from '../../core/repositories/categories.service';
 @Component({
   selector: 'app-category-picker',
   standalone: true,
-  imports: [RouterLink, IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonNote, IonTitle, IonToolbar],
+  imports: [CategoriesPage, IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonModal, IonNote, IonTitle, IonToolbar],
   styles: [
     `
       .grid {
@@ -83,11 +85,13 @@ import { CategoriesService } from '../../core/repositories/categories.service';
       <ion-toolbar>
         <ion-title>Category</ion-title>
         <ion-buttons slot="end">
-          <ion-button
-            [routerLink]="'/settings/categories/' + kind()"
-            aria-label="Manage categories"
-            (click)="dismissed.emit()"
-          >
+          <!--
+            Opens the manager over this sheet rather than navigating to it.
+            Navigating would unmount the transaction editor that owns this
+            overlay — leaving the half-written transaction lost and the picker
+            stranded over whatever page loaded next.
+          -->
+          <ion-button aria-label="Manage categories" (click)="managing.set(true)">
             <ion-icon slot="icon-only" name="create-outline" />
           </ion-button>
           <ion-button aria-label="Close" (click)="dismissed.emit()">
@@ -137,17 +141,22 @@ import { CategoriesService } from '../../core/repositories/categories.service';
         </div>
       } @else {
         <div class="empty">
-          <p>
-            <ion-note>
-              No {{ kind() }} categories yet.
-              <a [routerLink]="'/settings/categories/' + kind()" (click)="dismissed.emit()">
-                Add one
-              </a>
-              and it will appear here.
-            </ion-note>
-          </p>
+          <p><ion-note>No {{ kind() }} categories yet.</ion-note></p>
+          <ion-button fill="outline" size="small" (click)="managing.set(true)">
+            Add one
+          </ion-button>
         </div>
       }
+
+      <ion-modal [isOpen]="managing()" (didDismiss)="managing.set(false)">
+        <ng-template>
+          <app-categories
+            [forKind]="kind()"
+            [asModal]="true"
+            (closed)="managing.set(false)"
+          />
+        </ng-template>
+      </ion-modal>
     </ion-content>
   `,
 })
@@ -161,6 +170,9 @@ export class CategoryPickerComponent {
 
   /** Which category is showing its subcategories, if any. */
   readonly expanded = signal<string | null>(null);
+
+  /** Whether the category manager is open over this sheet. */
+  readonly managing = signal(false);
 
   readonly tree = computed(() => this.categories.tree(this.kind()));
 

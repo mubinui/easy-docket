@@ -42,6 +42,10 @@ describe('CategoryPickerComponent', () => {
     fixture.detectChanges();
   });
 
+  function host(): HTMLElement {
+    return fixture.nativeElement as HTMLElement;
+  }
+
   /** What the grid actually offers, in order. */
   function tiles(): string[] {
     return [...(fixture.nativeElement as HTMLElement).querySelectorAll('.tile')].map((tile) =>
@@ -155,6 +159,45 @@ describe('CategoryPickerComponent', () => {
       picker.choose(picker.tree()[0]);
 
       expect(dismissed).toBe(true);
+    });
+  });
+
+  describe('managing categories from here', () => {
+    /**
+     * The pencil used to be a `routerLink`. Navigating away unmounted the
+     * transaction editor that owns this overlay, so the URL changed to the
+     * settings screen while the picker stayed on top of it — a dead sheet over
+     * a page that could not be reached. It opens the manager over this sheet
+     * instead, which also keeps the half-written transaction.
+     */
+    it('navigates nowhere at all', () => {
+      // The property that broke, stated directly: nothing in this sheet is a
+      // link. Ionic moves `aria-label` into its shadow root, so the pencil
+      // cannot be found by label from here — but a link can, and there must
+      // not be one.
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelectorAll('a[href], [routerlink], [ng-reflect-router-link]')).toHaveLength(
+        0,
+      );
+    });
+
+    it('opens the manager without leaving', () => {
+      // Only the flag is asserted here: Ionic instantiates a modal's template
+      // when it presents, which needs an overlay lifecycle a unit test has no
+      // way to drive. `categories.spec.ts` drives the real thing.
+      expect(picker.managing()).toBe(false);
+      picker.managing.set(true);
+      expect(picker.managing()).toBe(true);
+    });
+
+    it('does not dismiss the picker when the manager opens', () => {
+      let dismissed = false;
+      picker.dismissed.subscribe(() => (dismissed = true));
+
+      picker.managing.set(true);
+      fixture.detectChanges();
+
+      expect(dismissed).toBe(false);
     });
   });
 });

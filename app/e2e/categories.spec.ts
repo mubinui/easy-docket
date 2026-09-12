@@ -155,4 +155,52 @@ test.describe('categories', () => {
 
     await expect(page.locator(LIST)).not.toContainText('Groceries');
   });
+
+  test('categories are managed from the picker without losing the transaction', async ({ page }) => {
+    /**
+     * The reported break: the picker's pencil was a link to the settings
+     * screen. Navigating unmounted the transaction editor that owns the
+     * overlay, so the URL changed while the picker stayed on top of it — a dead
+     * sheet over a page nobody could reach, and the half-written transaction
+     * gone with it.
+     */
+    await addAccount(page, 'Everyday', '1000.00');
+    await goToTab(page, 'Activity', Screen.transactions);
+    await tapAdd(page, Screen.transactions);
+    await fillField(page, 'Amount', '42.00');
+
+    const before = page.url();
+    await page.locator('ion-modal.show-modal').getByText('Choose a category').click();
+    await expect(page.locator(PICKER)).toBeVisible();
+    await page.locator(PICKER).getByRole('button', { name: 'Manage categories' }).click();
+
+    // The manager arrives over the picker; nothing navigated.
+    await expect(page.locator(LIST)).toBeVisible();
+    expect(page.url()).toBe(before);
+    await expect(page.locator(LIST).getByRole('button', { name: 'Done' })).toBeVisible();
+
+    // Add a category from here.
+    await tapAdd(page, LIST);
+    await fillField(page, 'Name', 'Childcare');
+    await tap(page, 'Save');
+    await expect(page.locator(LIST).getByText('Childcare')).toBeVisible();
+
+    // Back to the picker, which is offering it straight away.
+    await page.locator(LIST).getByRole('button', { name: 'Done' }).click();
+    await expect(page.locator(LIST)).toHaveCount(0);
+    await page.locator(PICKER).getByRole('button', { name: 'Childcare', exact: true }).click();
+    await expect(page.locator(PICKER)).toHaveCount(0);
+
+    // The transaction survived all of it.
+    const editor = page.locator('app-transaction-editor');
+    await expect(editor).toContainText('Childcare');
+    await expect(editor.locator('ion-input[label="Amount"] input')).toHaveValue('42.00');
+
+    await fillField(page, 'Payee', 'Nursery');
+    await tap(page, 'Save');
+    await waitForEditorClosed(page);
+    await expect(
+      page.locator(Screen.transactions).getByRole('heading', { name: 'Nursery' }),
+    ).toBeVisible();
+  });
 });

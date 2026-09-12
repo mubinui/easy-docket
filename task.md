@@ -35,7 +35,7 @@ Every task follows the same loop, and none of it is optional:
 | 10 | Starter accounts | ✅ Done |
 | 11 | Categories and subcategories | ✅ Done |
 
-Tests today: **871 client unit**, **91 end-to-end**, **95 Go**, **25 worker**.
+Tests today: **874 client unit**, **93 end-to-end**, **95 Go**, **25 worker**.
 
 ---
 
@@ -1292,6 +1292,16 @@ underneath closes the sheet immediately.
 nowhere to put a second level. The grid puts a vault's categories on one screen,
 which matters for the thing people do several times a day.
 
+**A link inside a sheet is a trap.** The picker's pencil was a `routerLink` to
+the management screen. Navigating unmounted the transaction editor that owns the
+overlay — so the URL became `/settings/categories/expense` while the picker
+stayed on top of it: a dead sheet over a page nobody could reach, and the
+half-written transaction gone with it. It opens the manager *over* the picker
+now, which is also the better answer to "I need a category that does not exist
+yet": nothing is lost and the new category is offered the moment it is saved.
+`CategoriesPage` takes its kind as an input when presented that way, and shows
+Done instead of a back button.
+
 **One bug worth recording.** The picker collapsed the moment it expanded:
 choosing a parent emitted the id, which came straight back as `selected`, and an
 effect that set the expansion unconditionally read that category's null parent
@@ -1464,6 +1474,12 @@ Things learned the hard way, worth not relearning:
   again".** Three separate editors reset themselves whenever an unrelated signal
   they happened to read changed — silently discarding whatever had been typed.
   Read the trigger, then do the rest inside `untracked`.
+- **A sheet must not navigate.** An Ionic overlay lives at the app root, so
+  routing away destroys the component holding its state but leaves the overlay
+  on screen — over whichever page loaded next. Open another sheet instead.
+- **`surface()` and `tapAdd` take the topmost sheet.** With a sheet on a sheet,
+  the first `ion-modal.show-modal` is the one furthest underneath, and typing
+  into it reaches a form nobody can see.
 - **A money figure appears more than once on a screen.** `toContainText('$1,000.00')`
   on a whole page matched an account's own row balance, not the headline it was
   meant to check — so the assertion passed before the switch had written

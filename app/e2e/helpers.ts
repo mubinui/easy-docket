@@ -26,7 +26,11 @@ export const Screen = {
 /** The open modal if there is one, else the named screen. */
 export async function surface(page: Page, screen?: string): Promise<Locator> {
   const modal = page.locator('ion-modal.show-modal');
-  if ((await modal.count()) > 0) return modal;
+  // `.last()` — the topmost sheet. Ionic appends each overlay after the one it
+  // opened over, so with a sheet on a sheet (the category manager over the
+  // picker over the transaction editor) the first match is the one furthest
+  // underneath, and typing into it would reach a form nobody can see.
+  if ((await modal.count()) > 0) return modal.last();
   return screen ? page.locator(screen) : page.locator('.ion-page:not(.ion-page-hidden)').last();
 }
 
@@ -158,7 +162,10 @@ export async function waitForEditorClosed(page: Page): Promise<void> {
 
 export async function tapAdd(page: Page, screen: string): Promise<void> {
   await page.locator(`${screen} ion-fab-button`).click();
-  await expect(page.locator('ion-modal.show-modal')).toBeVisible();
+  // `.last()`: the sheet this just opened, which may be a sheet on a sheet —
+  // the category manager opens over the picker, which is itself over the
+  // transaction editor.
+  await expect(page.locator('ion-modal.show-modal').last()).toBeVisible();
 }
 
 /** Create a vault and land on the summary screen. */

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -62,7 +62,11 @@ import { CategoryEditorComponent } from './category-editor.component';
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button defaultHref="/tabs/settings" />
+          @if (asModal()) {
+            <ion-button (click)="closed.emit()">Done</ion-button>
+          } @else {
+            <ion-back-button defaultHref="/tabs/settings" />
+          }
         </ion-buttons>
         <ion-title>{{ title() }}</ion-title>
       </ion-toolbar>
@@ -162,9 +166,22 @@ export class CategoriesPage {
   private readonly alerts = inject(AlertController);
   private readonly params = toSignal(inject(ActivatedRoute).paramMap);
 
-  /** `income` or `expense`, from the route; anything else is expense. */
-  readonly kind = computed<CategoryKind>(() =>
-    this.params()?.get('kind') === 'income' ? 'income' : 'expense',
+  /**
+   * Presented as a sheet rather than pushed as a page.
+   *
+   * Opened from the category picker while a transaction is half-written, so it
+   * cannot navigate: leaving the page would destroy the editor holding that
+   * transaction and strand its overlay on screen.
+   */
+  readonly asModal = input(false);
+  readonly closed = output<void>();
+
+  /** Given directly when presented as a sheet; otherwise read from the route. */
+  readonly forKind = input<CategoryKind | null>(null);
+
+  /** `income` or `expense`. Anything else is expense. */
+  readonly kind = computed<CategoryKind>(
+    () => this.forKind() ?? (this.params()?.get('kind') === 'income' ? 'income' : 'expense'),
   );
 
   readonly title = computed(() => (this.kind() === 'income' ? 'Income' : 'Expense'));
