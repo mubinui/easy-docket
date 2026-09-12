@@ -31,7 +31,7 @@ Every task follows the same loop, and none of it is optional:
 | 6 | Release readiness | ✅ Done |
 | 7 | Account groups & credit cards | ⏳ In progress |
 
-Tests today: **565 client unit**, **59 end-to-end**, **95 Go**.
+Tests today: **610 client unit**, **69 end-to-end**, **95 Go**.
 
 ---
 
@@ -828,18 +828,66 @@ racing to answer the same question, `AccountKind` is now documented as
 presentation only — it picks the icon and the label — and the group's type is
 the sole authority on behaviour.
 
-### 7.2 Groups service and CRUD
+### 7.2 Groups service and CRUD ✅
 
-- [ ] `AccountGroupsService` — live list ordered by `order` then name, save,
-      archive, delete, reorder
-- [ ] Deleting a group leaves its accounts ungrouped rather than deleting them
-- [ ] Group editor: name, type, colour, icon
-- [ ] Account editor gains a group picker, including "No group"
+- [x] `AccountGroupsService` — live list ordered by `order` then name then id,
+      save, archive, delete, reorder, move an account, `typeOf`/`isCreditCard`
+- [x] Deleting a group leaves its accounts ungrouped rather than deleting them
+- [x] Group editor: name, type, archived, with a note saying what the type does
+- [x] Account editor gains a group picker, including an explicit "No group"
+- [x] Groups screen at `/account-groups`, reached from the Accounts toolbar,
+      with drag-to-reorder and per-group account counts
 
-**Tests**
-- [ ] Unit: ordering, delete-orphans-not-cascades, a group's account list,
-      and that an archived group's accounts stay visible
-- [ ] Component: the editors save what was typed and nothing else
+**Tests** (45 added, 565 → 610; plus 10 end-to-end, 59 → 69)
+- [x] Unit: ordering and its tiebreaks, new groups landing at the bottom,
+      reorder writing only what moved, archive keeping members, delete
+      orphaning rather than cascading, membership, `typeOf` falling back to
+      `default` for an unknown group, and `kind` having no say in it
+- [x] Component: the group editor saves what was typed, keeps `order` and
+      `createdAt` across an edit, and reports a failure rather than half-saving
+- [x] Component: the account editor's picker files, unfiles, shows an account
+      whose group was deleted elsewhere as ungrouped, and leaves the rest of
+      the account untouched
+- [x] e2e: create a group, file an account into it, delete the group and watch
+      the account survive, and a group surviving a lock and unlock
+- [x] e2e: `editor-layout.spec.ts` — every editor fills its modal
+
+**The order has three keys, not one.** `order` is assigned per device, so two
+devices that each add a group offline will often pick the same number. Without
+a tiebreak the list would reshuffle on every sync depending on which row Dexie
+happened to return first, so ties fall back to name and then to id — a total
+order, and the same one everywhere.
+
+**Deleting a group clears its members explicitly.** The ledger does not cascade,
+which is right: a delete that could take accounts with it would be a frightening
+thing to have in a financial app. But an absence does not replicate either, so
+`remove` writes each member as an ordinary account edit before deleting the
+group. Another device learns the accounts moved rather than inferring it.
+
+**A dangling `groupId` is harmless by construction.** A group deleted on another
+device arrives here as an absence, so `typeOf` falls back to `default` and the
+account appears under "no group" rather than vanishing off the screen. The
+picker resolves the same way, so opening such an account and saving it does not
+write the dead id straight back.
+
+**What it found: every editor in the app was collapsed.** Adding one row to the
+account editor pushed its explanatory note off the bottom, which turned out not
+to be about that row at all. An Angular component host is `display: inline`, so
+`app-account-editor` never became a flex child of the modal's page wrapper, its
+`ion-content` collapsed to a 56px stub, and everything past the first rows was
+clipped into a scroll region that ended mid-screen.
+
+The transaction editor — the most-used screen in the app — was rendering its
+segment and **nothing else**: no amount, no account, no category, no payee, no
+date. It was live on the deployed site. Every one of the 59 end-to-end tests
+passed throughout, because Playwright's `fill()` types into an element whether
+or not a human could see it, and `ion-content` reported the text as present.
+
+The fix is five hosts made flex children in `global.scss`, with `flex: 1` rather
+than `height: 100%` — the first attempt used the latter and pushed the "Delete
+account" button, which is a *sibling* of the editor, off the bottom of the
+sheet. `editor-layout.spec.ts` asserts the geometry directly and fails on all
+five editors when the rule is removed.
 
 ### 7.3 Accounts screen grouped
 
@@ -896,6 +944,7 @@ Real, currently unaddressed, and each one has a home above.
 | ~~Git adapter has no integration test~~ | — | ✅ Closed: `git http-backend` in the e2e suite. **It found two bugs that made Git sync entirely non-functional** — see below |
 | ~~S3 adapter has no integration test~~ | — | ✅ Closed: MinIO in Docker. Passed first time |
 | `remove` is unproven against S3 and Git | Pruning is covered against the Go server and by unit tests, but the S3 and Git delete paths have not run against a real remote | Open. Needs a snapshot to trigger, which needs 200 operations — worth a seeded fixture rather than driving the UI |
+| A deleted transaction can come back if the app reloads immediately after | Real, and about data the user asked to be gone | Open, its own task. `recurring.spec.ts` "a deleted occurrence stays deleted" fails roughly 3 runs in 8, **before and after Phase 7 alike**. On a failing run the operation log holds only the `put` — no tombstone — and the row is still in the table, so the delete was lost rather than undone. The delete path is properly awaited (`remove()` → `TransactionsService.remove` → `LedgerService.remove`), which points at the write being cut off by the reload rather than at missing sequencing. Not guessed at: a wrong fix here silently resurrects financial records |
 | No rate limiting on the server | A leaked token can be used to exhaust disk | Server hardening, unscheduled — quotas blunt it today |
 | Single currency assumed in UI totals | Dashboard uses the first account's currency | Phase 5 |
 | Category deletion leaves transactions uncategorised | Silent, no warning | Small fix, fold into 2.3 |
@@ -951,6 +1000,11 @@ Things learned the hard way, worth not relearning:
 - **A stub agrees with whatever you wrote.** The Git adapter was unit-tested,
   typed and linted, and had never once worked. Anything that speaks a protocol
   needs to speak it to something that did not come from this repository.
+- **A passing test is not a visible screen.** Every editor in the app rendered
+  into a collapsed `ion-content` — the transaction editor showed its segment and
+  no fields at all — through 59 green end-to-end tests, because `fill()` and
+  `getByRole` reach an element whether or not it is on screen. Where a screen's
+  *layout* is the thing that matters, assert geometry, and look at it.
 - **A deployment is not a build.** The Pages workflow built and uploaded cleanly
   for weeks while hardcoding `--base-href /easy-docket/`. On the custom domain
   `docket.xiidea.net` the site serves from the root, so every asset URL 404'd

@@ -5,6 +5,7 @@ import {
   businessOutline,
   cardOutline,
   cashOutline,
+  folderOutline,
   phonePortraitOutline,
   saveOutline,
   trendingUpOutline,
@@ -18,8 +19,10 @@ import { formatMoney } from '../../core/util/money';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { SyncStatusComponent } from '../../shared/sync-status.component';
 import { AccountEditorComponent } from './account-editor.component';
+import { RouterLink } from '@angular/router';
 import {
   IonButton,
+  IonButtons,
   IonContent,
   IonFab,
   IonFabButton,
@@ -39,7 +42,7 @@ import {
 @Component({
   selector: 'app-accounts',
   standalone: true,
-  imports: [MoneyPipe, SyncStatusComponent, AccountEditorComponent, IonButton, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonModal, IonNote, IonTitle, IonToolbar],
+  imports: [RouterLink, MoneyPipe, SyncStatusComponent, AccountEditorComponent, IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonModal, IonNote, IonTitle, IonToolbar],
   styles: [
     `
       .total {
@@ -64,6 +67,11 @@ import {
     <ion-header>
       <ion-toolbar>
         <ion-title>Accounts</ion-title>
+        <ion-buttons slot="end">
+          <ion-button routerLink="/account-groups" aria-label="Account groups">
+            <ion-icon slot="icon-only" name="folder-outline" />
+          </ion-button>
+        </ion-buttons>
         <app-sync-status slot="end" />
       </ion-toolbar>
     </ion-header>
@@ -240,6 +248,7 @@ export class AccountsPage {
       addOutline,
       walletOutline,
       cashOutline,
+      folderOutline,
       businessOutline,
       cardOutline,
       phonePortraitOutline,

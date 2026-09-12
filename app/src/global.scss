@@ -77,3 +77,37 @@ ion-item-divider {
   --viz-muted: #898781;
   --viz-ink-secondary: #c3c2b7;
 }
+
+/*
+ * Components presented inside an `ion-modal`.
+ *
+ * A modal lays out its page as a column flex container and expects
+ * `ion-header` and `ion-content` to be children of it. Our editors wrap both in
+ * a component, and an Angular component host is `display: inline` by default —
+ * so the wrapper never becomes a flex child, `ion-content` cannot stretch, and
+ * it collapses to a stub that clips everything below the first rows into a
+ * scroll region ending mid-screen.
+ *
+ * The symptom is not a squashed layout but a blank one: the transaction editor
+ * rendered its segment and nothing else — no amount, no category, no payee —
+ * while every end-to-end test still passed, because Playwright's `fill()` works
+ * on an element whether or not a human could see it.
+ *
+ * `flex: 1` rather than `height: 100%`: some of these modals put a sibling
+ * beside the editor — the "Delete account" button lives next to the account
+ * editor, not inside it — and claiming the full height would push that sibling
+ * off the bottom of the sheet where nothing could reach it.
+ *
+ * Any component whose template starts with `ion-header` and is presented in a
+ * modal belongs in this list.
+ */
+app-account-editor,
+app-group-editor,
+app-budget-editor,
+app-rule-editor,
+app-transaction-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}

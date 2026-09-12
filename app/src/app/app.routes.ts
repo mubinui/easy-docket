@@ -48,6 +48,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/budgets/budgets.page').then((m) => m.BudgetsPage),
   },
   {
+    // Set up once, then mostly left alone — so it hangs off the Accounts
+    // screen rather than taking a fifth tab.
+    path: 'account-groups',
+    canActivate: [vaultGuard],
+    loadComponent: () =>
+      import('./features/accounts/groups.page').then((m) => m.AccountGroupsPage),
+  },
+  {
     path: 'recurring',
     canActivate: [vaultGuard],
     loadComponent: () => import('./features/recurring/rules.page').then((m) => m.RulesPage),

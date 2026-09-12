@@ -1,6 +1,7 @@
 import { Component, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Account, AccountKind } from '../../core/models/domain';
+import { AccountGroupsService } from '../../core/repositories/account-groups.service';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { formatAmount, parseAmount } from '../../core/util/money';
 import {
@@ -76,6 +77,25 @@ const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'BDT', 'AUD', 'CAD', 'JPY', 'SGD
 
         <ion-item>
           <ion-select
+            label="Group"
+            labelPlacement="stacked"
+            placeholder="No group"
+            [ngModel]="groupId()"
+            (ngModelChange)="groupId.set($event)"
+          >
+            <!--
+              An explicit "No group" rather than a clearable select: ungrouped is
+              a real place accounts live, not the absence of a choice.
+            -->
+            <ion-select-option [value]="null">No group</ion-select-option>
+            @for (group of groups.active(); track group.id) {
+              <ion-select-option [value]="group.id">{{ group.name }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+
+        <ion-item>
+          <ion-select
             label="Currency"
             labelPlacement="stacked"
             [disabled]="!!existing()"
@@ -130,6 +150,7 @@ const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'BDT', 'AUD', 'CAD', 'JPY', 'SGD
 })
 export class AccountEditorComponent {
   private readonly accounts = inject(AccountsService);
+  readonly groups = inject(AccountGroupsService);
 
   readonly existing = input<Account | null>(null);
   readonly saved = output<Account>();
@@ -142,6 +163,7 @@ export class AccountEditorComponent {
   readonly kind = signal<AccountKind>('bank');
   readonly currency = signal('USD');
   readonly openingBalance = signal('0.00');
+  readonly groupId = signal<string | null>(null);
   readonly archived = signal(false);
   readonly error = signal<string | null>(null);
 
@@ -153,6 +175,9 @@ export class AccountEditorComponent {
         this.kind.set(account.kind);
         this.currency.set(account.currency);
         this.openingBalance.set(formatAmount(account.openingBalance, account.currency));
+        // A group deleted elsewhere reads as no group rather than as a dangling
+        // selection the picker could not display.
+        this.groupId.set(this.groups.byId(account.groupId)?.id ?? null);
         this.archived.set(account.archived);
       } else {
         this.name.set('');
@@ -161,6 +186,7 @@ export class AccountEditorComponent {
         // with the first by default.
         this.currency.set(this.accounts.active()[0]?.currency ?? 'USD');
         this.openingBalance.set('0.00');
+        this.groupId.set(null);
         this.archived.set(false);
       }
       this.error.set(null);
@@ -177,6 +203,7 @@ export class AccountEditorComponent {
         kind: this.kind(),
         currency: this.currency(),
         openingBalance: parseAmount(this.openingBalance() || '0', this.currency()),
+        groupId: this.groupId(),
         archived: this.archived(),
         colour: existing?.colour ?? '#3880ff',
         icon: KINDS.find((k) => k.value === this.kind())?.icon ?? 'wallet-outline',
