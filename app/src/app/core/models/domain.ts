@@ -119,10 +119,19 @@ export interface Account {
 
 export type CategoryKind = 'income' | 'expense';
 
+/**
+ * A category, or a subcategory of one.
+ *
+ * One level of nesting, not a tree of arbitrary depth: `parentId` points at a
+ * top-level category and nothing points at a subcategory. Deeper nesting would
+ * mean every total had to decide how far to roll up, and a personal ledger has
+ * no use for "Food → Eating out → Lunch → Tuesday".
+ */
 export interface Category {
   id: string;
   name: string;
   kind: CategoryKind;
+  /** The category this is a subcategory of, or null for a top-level one. */
   parentId: string | null;
   colour: string;
   icon: string;

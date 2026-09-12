@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { liveQuery } from 'dexie';
 import { from } from 'rxjs';
+import { rootIds } from '../categories/tree';
 import { DOCKET_DB } from '../db/db.token';
 import { RatesService } from '../repositories/rates.service';
 import { DocketDb } from '../db/docket-db';
@@ -92,13 +93,16 @@ export class ReportsService {
   );
 
   readonly data = computed<ReportData>(() => {
-    const { transactions, accounts } = this.ledger();
+    const { transactions, accounts, categories } = this.ledger();
     const range = this.range();
     const reporting = this.rates.reportingCurrency();
 
     return {
       range,
-      categories: spendByCategory(transactions, range, reporting),
+      // Rolled up: spending filed under "Food → Lunch" belongs to Food here.
+      // A report that split one category across its subcategories would answer
+      // a question nobody asked.
+      categories: spendByCategory(transactions, range, reporting, rootIds(categories)),
       flow: flowByMonth(transactions, range, reporting),
       netWorth: netWorthOver(accounts, transactions, range, reporting, (currency) =>
         this.rates.rateToReporting(currency),

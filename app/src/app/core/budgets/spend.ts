@@ -35,21 +35,32 @@ export interface BudgetProgress {
  * Only expenses. Income is not spending, and a transfer moves money between the
  * user's own accounts — counting it would let someone blow a grocery budget by
  * moving savings around.
+ *
+ * `covered` is the budget's categories **and their subcategories**, which the
+ * caller expands with `withDescendants`. A budget on "Food" has to count what
+ * was spent on "Food → Lunch"; without that, adding a subcategory would quietly
+ * stop an existing budget seeing the spending it was set up to watch. Callers
+ * that have no category tree to hand can omit it and get the budget's own list,
+ * which is what this did before subcategories existed.
  */
-export function countsTowards(budget: Budget, transaction: Transaction): boolean {
-  return (
-    transaction.kind === 'expense' &&
-    transaction.categoryId !== null &&
-    budget.categoryIds.includes(transaction.categoryId)
-  );
+export function countsTowards(
+  budget: Budget,
+  transaction: Transaction,
+  covered?: ReadonlySet<string>,
+): boolean {
+  if (transaction.kind !== 'expense' || transaction.categoryId === null) return false;
+  return covered
+    ? covered.has(transaction.categoryId)
+    : budget.categoryIds.includes(transaction.categoryId);
 }
 
 export function spendIn(
   budget: Budget,
   window: BudgetWindow,
   transactions: readonly Transaction[],
+  covered?: ReadonlySet<string>,
 ): Minor {
-  return spendDetail(budget, window, transactions).spent;
+  return spendDetail(budget, window, transactions, covered).spent;
 }
 
 /**
@@ -65,12 +76,13 @@ export function spendDetail(
   budget: Budget,
   window: BudgetWindow,
   transactions: readonly Transaction[],
+  covered?: ReadonlySet<string>,
 ): { spent: Minor; unconverted: number } {
   let spent = 0;
   let unconverted = 0;
 
   for (const transaction of transactions) {
-    if (!countsTowards(budget, transaction)) continue;
+    if (!countsTowards(budget, transaction, covered)) continue;
     if (transaction.date < window.from || transaction.date > window.to) continue;
 
     const amount = inReporting(transaction, budget.currency);
@@ -92,6 +104,7 @@ export function carriedInto(
   budget: Budget,
   index: number,
   transactions: readonly Transaction[],
+  covered?: ReadonlySet<string>,
 ): Minor {
   if (!budget.rollover || index <= 0) return 0;
 
@@ -99,7 +112,7 @@ export function carriedInto(
   // running total is what an unbroken chain of periods has left over.
   let carry = 0;
   for (let period = 0; period < index; period++) {
-    carry += budget.amount - spendIn(budget, windowByIndex(budget, period), transactions);
+    carry += budget.amount - spendIn(budget, windowByIndex(budget, period), transactions, covered);
   }
   return carry;
 }
@@ -109,13 +122,14 @@ export function progressFor(
   budget: Budget,
   transactions: readonly Transaction[],
   asOf: string,
+  covered?: ReadonlySet<string>,
 ): BudgetProgress | null {
   const window = windowFor(budget, asOf);
   if (!window) return null;
 
-  const carried = carriedInto(budget, window.index, transactions);
+  const carried = carriedInto(budget, window.index, transactions, covered);
   const allowance = budget.amount + carried;
-  const { spent, unconverted } = spendDetail(budget, window, transactions);
+  const { spent, unconverted } = spendDetail(budget, window, transactions, covered);
   const remaining = allowance - spent;
 
   return {

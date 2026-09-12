@@ -4,6 +4,7 @@ import { liveQuery } from 'dexie';
 import { from } from 'rxjs';
 import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
+import { CategoryNode, buildTree, compareCategories, descendantIds } from '../categories/tree';
 import { Category, CategoryKind } from '../models/domain';
 import { LedgerService } from './ledger.service';
 
@@ -43,6 +44,37 @@ export class CategoriesService {
     return kind === 'income' ? this.income() : this.expense();
   }
 
+  /** Top-level categories of a kind, each with its subcategories, in order. */
+  tree(kind: CategoryKind): CategoryNode[] {
+    return buildTree(this.active(), kind);
+  }
+
+  /** Top-level categories of a kind — what a subcategory can be filed under. */
+  parents(kind: CategoryKind): Category[] {
+    return this.active()
+      .filter((category) => category.kind === kind && category.parentId === null)
+      .sort(compareCategories);
+  }
+
+  /** The subcategories of a category, in order. */
+  childrenOf(categoryId: string): Category[] {
+    return this.active()
+      .filter((category) => category.parentId === categoryId)
+      .sort(compareCategories);
+  }
+
+  /**
+   * The full name of a category: "Food → Lunch" for a subcategory, "Food" for a
+   * top-level one. What a register row shows, so a transaction's category is
+   * unambiguous without opening it.
+   */
+  pathOf(id: string | null): string {
+    const category = this.byId(id);
+    if (!category) return '';
+    const parent = this.byId(category.parentId);
+    return parent ? `${parent.name} › ${category.name}` : category.name;
+  }
+
   byId(id: string | null): Category | undefined {
     return id ? this.all().find((category) => category.id === id) : undefined;
   }
@@ -57,8 +89,30 @@ export class CategoriesService {
     } as Category);
   }
 
+  /**
+   * Delete a category.
+   *
+   * A subcategory goes on its own. A top-level category takes its subcategories
+   * with it — they cannot outlive their parent as anything meaningful, and
+   * leaving them behind as orphans would put categories on screen that the user
+   * believes they deleted.
+   *
+   * Transactions already filed against any of them keep their `categoryId` and
+   * read as uncategorised. That is the existing behaviour for a deleted
+   * category, and the alternative — rewriting history to say a purchase was
+   * something else — is worse.
+   */
   async remove(id: string): Promise<void> {
+    for (const childId of descendantIds(id, this.all())) {
+      await this.ledger.remove('categories', childId);
+    }
     await this.ledger.remove('categories', id);
+  }
+
+  /** How many transactions would be left uncategorised by deleting this. */
+  async transactionCount(id: string): Promise<number> {
+    const ids = new Set([id, ...descendantIds(id, this.all())]);
+    return this.db.transactions.filter((txn) => txn.categoryId !== null && ids.has(txn.categoryId)).count();
   }
 
   /**

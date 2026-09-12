@@ -33,8 +33,9 @@ Every task follows the same loop, and none of it is optional:
 | 8 | Accounts in totals | ✅ Done |
 | 9 | Assets and liabilities | ✅ Done |
 | 10 | Starter accounts | ✅ Done |
+| 11 | Categories and subcategories | ⏳ In progress |
 
-Tests today: **806 client unit**, **84 end-to-end**, **95 Go**, **25 worker**.
+Tests today: **849 client unit**, **84 end-to-end**, **95 Go**, **25 worker**.
 
 ---
 
@@ -1189,6 +1190,83 @@ it gets no Pay button: that sheet is written about a card's statement and bill,
 and offering it for a loan would present a flow nobody designed for repayments.
 Recording a repayment by hand as a transfer works exactly as it always did.
 Generalising the sheet to loan repayments is a real follow-up, not a side effect.
+
+## Phase 11 — Categories and subcategories
+
+Categories have been seeded and never managed: there is no screen to add, rename
+or remove one. `Category.parentId` has existed since v1, is indexed, and is read
+by nothing — subcategories are modelled and unused.
+
+**The transaction stores the leaf.** Filing a transaction under *Food → Lunch*
+sets `categoryId` to Lunch. Storing both would be two fields that can disagree,
+and storing only the parent would throw away the detail the subcategory exists
+to record.
+
+**Which means roll-up is part of this task, not a follow-up.** Budgets match on
+exact `categoryId` and reports group by it, so without roll-up, adding a
+subcategory would silently stop an existing budget counting a transaction and
+split one category's spending into several rows. A budget on a parent counts its
+children; a report groups children under their parent.
+
+### 11.1 Model, ordering and roll-up ✅
+
+- [x] `core/categories/tree.ts`, pure: `compareCategories`, `buildTree`,
+      `rootIdOf`, `rootIds`, `descendantIds`, `withDescendants`
+- [x] `CategoriesService`: the tree, parents, children, `pathOf`, and deleting a
+      parent taking its subcategories with it
+- [x] No stored position: categories sort by name. Asked for and declined —
+      hand-ordering is a field to keep correct across devices, a drag handle on
+      every row, and a reorder path in the log, for a list people read
+      alphabetically anyway
+- [x] Budgets expand their categories to cover subcategories; reports and the
+      summary card roll subcategory spending up to the parent
+
+**Tests** (43 added, 806 → 849)
+- [x] Unit (tree): ordering by name with an id tiebreak, nesting, keeping kinds
+      apart, promoting an orphan rather than dropping it, refusing to nest below
+      one level, and each roll-up helper
+- [x] Unit (service): the tree, parents, children, `pathOf`, deleting a parent
+      taking its children, replicating every removal, and counting what a
+      deletion would leave uncategorised
+- [x] `rollup.spec.ts` — the guarantee this phase turns on, stated end to end:
+      subcategory spending counts against a parent budget and appears as one
+      report row, through the real `BudgetsService`
+
+**One level, not a tree.** `parentId` points at a top-level category and nothing
+points at a subcategory. Deeper nesting would mean every total had to decide how
+far to roll up, and a personal ledger has no use for "Food → Eating out → Lunch
+→ Tuesday". `buildTree` enforces it: anything pointing at a subcategory is
+treated as top-level rather than trusted.
+
+**An orphan is promoted, not dropped.** A subcategory whose parent was deleted
+on another device appears at the top level. One on screen can be moved or
+deleted; one that has silently vanished cannot.
+
+**The roll-up is the point.** Before this, every transaction carried a top-level
+category and budgets matched it exactly. The moment one is filed under
+"Food → Lunch" an exact match stops seeing it: a budget under-counts and a
+report splits one category into several rows, neither of which announces itself.
+`rollup.spec.ts` keeps a test of the *old* behaviour — a budget on Food missing
+Lunch without the expansion — because that is the assumption a reader would
+otherwise carry.
+
+### 11.2 Managing them
+
+- [ ] Settings → **Income categories** and **Expense categories**
+- [ ] Each lists its categories by name: how many subcategories, the first few
+      named, edit, delete
+- [ ] A **Subcategories** switch, so the extra layer can be left alone entirely
+- [ ] The editor adds, renames and removes subcategories inline
+
+### 11.3 Picking one
+
+- [ ] The transaction editor picks a category from a grid rather than a select
+- [ ] A category with subcategories expands in place; choosing one files the
+      transaction under it
+- [ ] Choosing the parent itself stays possible — not everything has a
+      subcategory, and forcing one would make the quick path slower
+
+---
 
 ---
 

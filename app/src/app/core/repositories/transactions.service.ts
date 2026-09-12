@@ -2,12 +2,14 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { liveQuery } from 'dexie';
 import { from } from 'rxjs';
+import { rootIds } from '../categories/tree';
 import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { Transaction } from '../models/domain';
 import { inReporting } from '../money/conversion';
 import { DateRange, currentMonth } from '../util/dates';
 import { LedgerService } from './ledger.service';
+import { CategoriesService } from './categories.service';
 import { RatesService } from './rates.service';
 
 /**
@@ -33,6 +35,7 @@ export class TransactionsService {
   private readonly db: DocketDb = inject(DOCKET_DB);
   private readonly ledger = inject(LedgerService);
   private readonly rates = inject(RatesService);
+  private readonly categories = inject(CategoriesService);
 
   /** The window the transactions screen is looking at; drives the live query. */
   readonly filter = signal<TransactionFilter>({
@@ -118,6 +121,9 @@ export class TransactionsService {
   readonly spendByCategory = computed(() => {
     const reporting = this.rates.reportingCurrency();
     const totals = new Map<string, number>();
+    // Subcategory spending belongs to its parent on the summary card, the same
+    // way it does in reports.
+    const roots = rootIds(this.categories.all());
 
     for (const txn of this.visible()) {
       if (txn.kind !== 'expense') continue;
@@ -125,7 +131,7 @@ export class TransactionsService {
       const amount = inReporting(txn, reporting);
       if (amount === null) continue;
 
-      const key = txn.categoryId ?? 'uncategorised';
+      const key = txn.categoryId !== null ? (roots.get(txn.categoryId) ?? txn.categoryId) : 'uncategorised';
       totals.set(key, (totals.get(key) ?? 0) + amount);
     }
     return [...totals.entries()]

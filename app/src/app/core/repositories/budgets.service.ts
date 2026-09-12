@@ -8,6 +8,7 @@ import { DocketDb } from '../db/docket-db';
 import { Budget } from '../models/domain';
 import { LedgerService } from './ledger.service';
 import { RatesService } from './rates.service';
+import { withDescendants } from '../categories/tree';
 import { toIsoDate } from '../util/dates';
 
 /** What a caller must supply to create a budget; the rest defaults. */
@@ -72,7 +73,16 @@ export class BudgetsService {
           .filter((budget) => !budget.archived)
           .map<BudgetStatus>((budget) => ({
             budget,
-            progress: progressFor(budget, transactions, today),
+            // A budget names categories; the transactions are filed against
+            // those *or their subcategories*, so the selection is expanded
+            // before anything is counted. Without this, adding a subcategory
+            // would quietly stop an existing budget seeing its own spending.
+            progress: progressFor(
+              budget,
+              transactions,
+              today,
+              withDescendants(budget.categoryIds, categories),
+            ),
             staleCategoryIds: staleCategoryIds(budget, known),
           }));
       }),

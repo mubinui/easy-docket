@@ -53,11 +53,19 @@ export interface PayeeTotal {
   count: number;
 }
 
-/** Spending per category over a range, largest first. */
+/**
+ * Spending per category over a range, largest first.
+ *
+ * `roots` maps a category id to the top-level category it rolls up to. Pass it
+ * and a transaction filed under "Food → Lunch" is counted against Food: one row
+ * for the category, as before subcategories existed. Omit it and every category
+ * stands on its own, which is what a drill-down into one category wants.
+ */
 export function spendByCategory(
   transactions: readonly Transaction[],
   range: DateRange,
   reporting: string,
+  roots?: ReadonlyMap<string, string>,
 ): CategoryTotal[] {
   const totals = new Map<string | null, { amount: Minor; count: number }>();
 
@@ -67,7 +75,10 @@ export function spendByCategory(
     const amount = inReporting(transaction, reporting);
     if (amount === null) continue;
 
-    const key = transaction.categoryId;
+    const key =
+      transaction.categoryId !== null
+        ? (roots?.get(transaction.categoryId) ?? transaction.categoryId)
+        : null;
     const entry = totals.get(key) ?? { amount: 0, count: 0 };
     entry.amount += amount;
     entry.count += 1;
