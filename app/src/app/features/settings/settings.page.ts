@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { addIcons } from 'ionicons';
 import {
+  calculatorOutline,
   cloudOutline,
   informationCircleOutline,
   lockClosedOutline,
@@ -13,6 +14,7 @@ import {
 import { VaultService } from '../../core/keys/vault.service';
 import { SyncSettingsService } from '../../core/sync/sync-settings.service';
 import { SyncService } from '../../core/sync/sync.service';
+import { AccountsService } from '../../core/repositories/accounts.service';
 import { RatesService } from '../../core/repositories/rates.service';
 import { ThemeChoice, ThemeService } from '../../core/theme/theme.service';
 import {
@@ -91,6 +93,17 @@ import {
       </ion-list>
 
       <ion-list>
+        <ion-list-header><ion-label>Totals</ion-label></ion-list-header>
+        <ion-item button routerLink="/settings/totals" detail="true">
+          <ion-icon slot="start" name="calculator-outline" />
+          <ion-label>
+            <h3>Accounts in totals</h3>
+            <p>{{ countedSummary() }}</p>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+
+      <ion-list>
         <ion-list-header><ion-label>Security</ion-label></ion-list-header>
         <ion-item button routerLink="/settings/security" detail="true">
           <ion-icon slot="start" name="shield-outline" />
@@ -121,10 +134,19 @@ import {
 export class SettingsPage {
   readonly theme = inject(ThemeService);
   readonly rates = inject(RatesService);
+  readonly accounts = inject(AccountsService);
   private readonly settings = inject(SyncSettingsService);
   private readonly sync = inject(SyncService);
   private readonly vault = inject(VaultService);
   private readonly router = inject(Router);
+
+  /** "All 4 accounts" or "3 of 4 accounts", so the state is visible without opening it. */
+  readonly countedSummary = computed(() => {
+    const active = this.accounts.active().length;
+    const counted = this.accounts.counted().length;
+    const noun = active === 1 ? 'account' : 'accounts';
+    return counted === active ? `All ${active} ${noun}` : `${counted} of ${active} ${noun}`;
+  });
 
   readonly targetLabel = computed(() => {
     const target = this.settings.settings().target;
@@ -169,6 +191,7 @@ export class SettingsPage {
       informationCircleOutline,
       swapHorizontalOutline,
       documentTextOutline,
+      calculatorOutline,
     });
   }
 }

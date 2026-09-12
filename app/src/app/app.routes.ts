@@ -82,6 +82,12 @@ export const routes: Routes = [
       import('./features/settings/sync-settings.page').then((m) => m.SyncSettingsPage),
   },
   {
+    path: 'settings/totals',
+    canActivate: [vaultGuard],
+    loadComponent: () =>
+      import('./features/settings/totals.page').then((m) => m.TotalsSettingsPage),
+  },
+  {
     path: 'settings/security',
     canActivate: [vaultGuard],
     loadComponent: () =>

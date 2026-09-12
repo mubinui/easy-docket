@@ -94,6 +94,21 @@ export interface Account {
   /** Day of the month the payment is due, 1–31, clamped the same way. */
   dueDay?: number;
 
+  /**
+   * Leave this account out of net worth and the other aggregate totals.
+   *
+   * The account is still a full part of the ledger: its transactions are
+   * recorded, its balance is shown, its register works. What changes is whether
+   * it is added into "what am I worth" — for an account you track but do not
+   * consider yours to spend, a shared pot, or a business account kept alongside
+   * a personal one.
+   *
+   * Stated as an exclusion rather than an inclusion so that the absent field
+   * means "counted", which is what every account written before this existed
+   * should mean, and what a newly created account should mean too.
+   */
+  excludedFromTotals?: boolean;
+
   createdAt: number;
   updatedAt: string;
 }

@@ -1,5 +1,6 @@
 import { convert, sameCurrency } from '../money/conversion';
 import { Account, AccountGroup, Minor } from '../models/domain';
+import { countsInTotals } from './totals';
 
 /**
  * The accounts screen, arranged.
@@ -23,6 +24,8 @@ export interface AccountSection {
   owed: boolean;
   /** Currencies left out of `subtotal` because no rate is known. */
   unconverted: string[];
+  /** Accounts in this section the user has excluded from totals. */
+  excluded: number;
 }
 
 export interface SectionInput {
@@ -91,9 +94,18 @@ export function buildSections(input: SectionInput): AccountSection[] {
     owed: boolean,
   ): AccountSection {
     let total = 0;
+    let excluded = 0;
     const missing: string[] = [];
 
     for (const account of inSection) {
+      // An account left out of totals still appears in its group — it is a real
+      // account with a real balance — but it is not added in. A subtotal that
+      // disagreed with the net worth above it would be worse than either.
+      if (!countsInTotals(account)) {
+        excluded++;
+        continue;
+      }
+
       const balance = balances.get(account.id) ?? account.openingBalance;
 
       if (sameCurrency(account.currency, reporting)) {
@@ -117,6 +129,7 @@ export function buildSections(input: SectionInput): AccountSection[] {
       subtotal: displayBalance(total, owed),
       owed,
       unconverted: [...new Set(missing)],
+      excluded,
     };
   }
 }

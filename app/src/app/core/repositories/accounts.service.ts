@@ -6,6 +6,7 @@ import { DOCKET_DB } from '../db/db.token';
 import { DocketDb } from '../db/docket-db';
 import { inReporting, sameCurrency } from '../money/conversion';
 import { Account } from '../models/domain';
+import { countsInTotals } from '../accounts/totals';
 import { signedFor } from '../util/money';
 import { LedgerService } from './ledger.service';
 import { RatesService } from './rates.service';
@@ -41,6 +42,14 @@ export class AccountsService {
   });
 
   readonly active = computed(() => this.all().filter((account) => !account.archived));
+
+  /**
+   * The accounts that count towards net worth.
+   *
+   * An account is counted unless it has been explicitly left out, so a ledger
+   * written before this setting existed behaves exactly as it did.
+   */
+  readonly counted = computed(() => this.active().filter((account) => countsInTotals(account)));
 
   /**
    * Current balance per account id.
@@ -89,7 +98,7 @@ export class AccountsService {
     let total = 0;
     const unconverted: string[] = [];
 
-    for (const account of this.active()) {
+    for (const account of this.counted()) {
       const balance = balances.get(account.id) ?? 0;
 
       if (sameCurrency(account.currency, reporting)) {
@@ -105,8 +114,22 @@ export class AccountsService {
       total += convertBalance(balance, rate, account.currency, reporting);
     }
 
-    return { total, unconverted: [...new Set(unconverted)], currency: reporting };
+    return {
+      total,
+      unconverted: [...new Set(unconverted)],
+      currency: reporting,
+      // How many accounts the user has deliberately left out, so a screen can
+      // say the total is partial rather than looking simply wrong.
+      excluded: this.active().length - this.counted().length,
+    };
   });
+
+  /** Include or exclude an account from the aggregate totals. */
+  async setCountedInTotals(id: string, counted: boolean): Promise<void> {
+    const account = await this.get(id);
+    if (!account) return;
+    await this.ledger.put('accounts', { ...account, excludedFromTotals: !counted });
+  }
 
   byId(id: string): Account | undefined {
     return this.all().find((account) => account.id === id);

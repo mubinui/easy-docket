@@ -30,8 +30,9 @@ Every task follows the same loop, and none of it is optional:
 | 5 | Multi-currency | ✅ Done |
 | 6 | Release readiness | ✅ Done |
 | 7 | Account groups & credit cards | ✅ Done |
+| 8 | Accounts in totals | ✅ Done |
 
-Tests today: **735 client unit**, **75 end-to-end**, **95 Go**.
+Tests today: **760 client unit**, **80 end-to-end**, **95 Go**.
 
 ---
 
@@ -1051,6 +1052,75 @@ Real, currently unaddressed, and each one has a home above.
 | Reports have no per-category drill-down | Tapping a bar does nothing | Unscheduled; the Activity screen already filters by category |
 | Android build needs JDK 21 | JDK 25 is rejected by this Gradle | Documented in `docs/DEPLOYMENT.md`; revisit on Gradle upgrade |
 
+## Phase 8 — Accounts in totals
+
+Settings → **Accounts in totals**: a switch per account deciding whether it is
+part of net worth and the balance sheet. Everything else about the account is
+untouched — its transactions, its register, its own balance on screen.
+
+### 8.1 The setting ✅
+
+- [x] `Account.excludedFromTotals`, optional
+- [x] `core/accounts/totals.ts` — `countsInTotals`, the single place that decides
+- [x] `AccountsService.counted`, `netWorthDetail.excluded`, `setCountedInTotals`
+- [x] Section subtotals skip excluded accounts and report how many
+- [x] A settings screen at `/settings/totals`, and Settings says "3 of 4 accounts"
+- [x] The accounts screen marks an excluded row "not counted" and says how many
+      the headline leaves out, with a link to change it
+
+**Tests** (25 added, 735 → 760; plus 5 end-to-end, 75 → 80)
+- [x] Unit: absent means counted, explicit false means counted, true means not
+- [x] Unit (sections): an excluded account is still listed but not added in, is
+      not reported as an unconverted currency, and is left out of what a card
+      section says is owed
+- [x] Component: the list, its groups, archived accounts kept out, switching off
+      and on again, net worth moving, the account and its transactions left
+      alone, and the change replicating as an ordinary account edit
+- [x] e2e: default, switching off, the accounts and summary screens agreeing,
+      an excluded account still recording transactions, and the choice
+      surviving a lock and unlock
+
+**The field is an exclusion, not an inclusion.** The absent value has to mean
+"counted", or shipping this would silently empty every existing ledger's net
+worth. A test says so in as many words.
+
+**An excluded account is still shown, and still says so.** It keeps its row and
+its balance, marked "not counted", and the header says how many are left out
+with a link to the setting. A subtotal that quietly disagreed with the rows
+above it would be worse than either number alone.
+
+**Archived is not the same thing.** Archiving hides an account; excluding keeps
+it on screen and out of the arithmetic. Archived accounts were already left out
+of totals, and the screen says so rather than offering a switch that would not
+mean anything.
+
+### 8.2 Transfers are not expenses ✅
+
+Asked directly: does paying a credit card book the expense twice? It does not,
+and now there is a suite that will fail if that ever changes.
+
+`core/accounts/no-double-count.spec.ts` drives the real services: spend on a
+card, then pay the card from a current account, and assert that
+
+- exactly two transactions exist, one expense and one transfer;
+- the period totals count 200 of spending, not 400;
+- exactly one transaction counts towards a budget;
+- net worth is down by the purchase and unmoved by the payment;
+- both balances move by the payment, in opposite directions;
+- a period containing only the payment reports no spending at all.
+
+The guarantee was already there — `totalsFor`, `countsTowards`, `spendByCategory`
+and the month totals each skip transfers, and `signedFor` nets a transfer to
+zero across the two accounts. What was missing was a test saying so from the
+outside, in the terms someone would actually ask the question.
+
+**One expectation of mine was wrong and worth keeping.** A payment made *before*
+the statement closes is on that same statement, so the statement closes at
+nothing owed rather than showing the purchase. Both arrangements — paid before
+the close, and paid after it — now have a test.
+
+---
+
 ---
 
 ## The flaky delete
@@ -1142,6 +1212,12 @@ Things learned the hard way, worth not relearning:
 - **A stub agrees with whatever you wrote.** The Git adapter was unit-tested,
   typed and linted, and had never once worked. Anything that speaks a protocol
   needs to speak it to something that did not come from this repository.
+- **A money figure appears more than once on a screen.** `toContainText('$1,000.00')`
+  on a whole page matched an account's own row balance, not the headline it was
+  meant to check — so the assertion passed before the switch had written
+  anything, and the reload that followed lost the write. Scope a total to the
+  element that shows it. This is the same failure as the delete below, in a
+  different costume.
 - **An open modal hides the page behind it from `getByRole`.** Ionic takes the
   page underneath out of the accessibility tree, so a role-scoped assertion that
   a row is *gone* passes the instant the modal opens — while the row is still in

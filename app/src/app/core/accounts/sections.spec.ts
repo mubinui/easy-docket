@@ -229,4 +229,72 @@ describe('buildSections', () => {
       expect(result[0].owed).toBe(true);
     });
   });
+
+  describe('accounts left out of totals', () => {
+    it('still lists the account, but does not add it in', async () => {
+      const result = sections(
+        [
+          anAccount({ id: 'a-mine', groupId: 'g-1' }),
+          anAccount({ id: 'a-theirs', groupId: 'g-1', excludedFromTotals: true }),
+        ],
+        [anAccountGroup({ id: 'g-1', type: 'default' })],
+        { 'a-mine': 100_00, 'a-theirs': 900_00 },
+      );
+
+      // The row is there — it is a real account with a real balance.
+      expect(result[0].accounts.map((a) => a.id)).toEqual(['a-mine', 'a-theirs']);
+      // The subtotal is not.
+      expect(result[0].subtotal).toBe(100_00);
+      expect(result[0].excluded).toBe(1);
+    });
+
+    it('counts an account with the field absent, as every old ledger has', () => {
+      const result = sections(
+        [anAccount({ id: 'a-1', groupId: 'g-1' })],
+        [anAccountGroup({ id: 'g-1', type: 'default' })],
+        { 'a-1': 100_00 },
+      );
+
+      expect(result[0].subtotal).toBe(100_00);
+      expect(result[0].excluded).toBe(0);
+    });
+
+    it('leaves a section headed but empty-totalled when everything in it is excluded', () => {
+      const result = sections(
+        [anAccount({ id: 'a-1', groupId: 'g-1', excludedFromTotals: true })],
+        [anAccountGroup({ id: 'g-1', type: 'default' })],
+        { 'a-1': 100_00 },
+      );
+
+      expect(result[0].accounts).toHaveLength(1);
+      expect(result[0].subtotal).toBe(0);
+      expect(result[0].excluded).toBe(1);
+    });
+
+    it('does not report an excluded currency as unconverted', () => {
+      // It is left out because the user said so, not because a rate is missing;
+      // telling them to add a rate would be a red herring.
+      const result = sections(
+        [anAccount({ id: 'a-gbp', currency: 'GBP', groupId: 'g-1', excludedFromTotals: true })],
+        [anAccountGroup({ id: 'g-1', type: 'default' })],
+        { 'a-gbp': 100_00 },
+      );
+
+      expect(result[0].unconverted).toEqual([]);
+      expect(result[0].excluded).toBe(1);
+    });
+
+    it('leaves an excluded card out of what a card section says is owed', () => {
+      const result = sections(
+        [
+          anAccount({ id: 'a-visa', groupId: 'g-cards' }),
+          anAccount({ id: 'a-old', groupId: 'g-cards', excludedFromTotals: true }),
+        ],
+        [anAccountGroup({ id: 'g-cards', type: 'credit-card' })],
+        { 'a-visa': -100_00, 'a-old': -900_00 },
+      );
+
+      expect(result[0].subtotal).toBe(100_00);
+    });
+  });
 });

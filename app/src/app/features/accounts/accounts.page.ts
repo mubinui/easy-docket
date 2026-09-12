@@ -12,6 +12,7 @@ import {
   walletOutline,
 } from 'ionicons/icons';
 import { AccountSection, buildSections, displayBalance } from '../../core/accounts/sections';
+import { countsInTotals } from '../../core/accounts/totals';
 import { availableCredit, dueDateFor, hasCycle, lastStatementDate } from '../../core/cards/statement';
 import { Account } from '../../core/models/domain';
 import { convert } from '../../core/money/conversion';
@@ -93,6 +94,14 @@ import {
             </ion-note>
           </div>
         }
+        @if (excludedCount(); as excluded) {
+          <div class="warning">
+            <ion-note>
+              Not counting {{ excluded }} account{{ excluded === 1 ? '' : 's' }} —
+              <a routerLink="/settings/totals">change</a>
+            </ion-note>
+          </div>
+        }
 
         @for (section of sections(); track section.group?.id ?? 'ungrouped') {
           <ion-list>
@@ -119,7 +128,12 @@ import {
                 <ion-icon slot="start" [name]="account.icon" [style.color]="account.colour" />
                 <ion-label>
                   <h3>{{ account.name }}</h3>
-                  <p>{{ subtitle(account, section) }}</p>
+                  <p>
+                    {{ subtitle(account, section) }}
+                    @if (!counted(account)) {
+                      · not counted
+                    }
+                  </p>
                 </ion-label>
                 <ion-note slot="end" [color]="alarming(account, section) ? 'danger' : undefined">
                   {{ shown(account, section) | money: account.currency }}
@@ -210,6 +224,12 @@ export class AccountsPage {
 
   readonly reportingCurrency = computed(() => this.rates.reportingCurrency());
   readonly unconverted = computed(() => this.accounts.netWorthDetail().unconverted);
+  readonly excludedCount = computed(() => this.accounts.netWorthDetail().excluded);
+
+  /** Whether this account is part of the totals above it. */
+  counted(account: Account): boolean {
+    return countsInTotals(account);
+  }
 
   /**
    * The active accounts arranged by group, with a subtotal each.
