@@ -75,6 +75,25 @@ export interface Account {
    */
   groupId?: string | null;
 
+  /**
+   * Terms of a credit card. All optional, and all meaningless unless this
+   * account's group is `credit-card` — the group decides what an account *is*,
+   * and these only describe how that kind of account behaves.
+   *
+   * They are kept on the account rather than the group because they differ per
+   * card: two cards filed together will rarely share a limit or a closing day.
+   */
+
+  /** The card's credit limit, as a positive amount in minor units. */
+  creditLimit?: Minor;
+  /**
+   * Day of the month the statement closes, 1–31. A day past the end of a short
+   * month falls on that month's last day rather than spilling into the next.
+   */
+  statementDay?: number;
+  /** Day of the month the payment is due, 1–31, clamped the same way. */
+  dueDay?: number;
+
   createdAt: number;
   updatedAt: string;
 }

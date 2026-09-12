@@ -173,4 +173,64 @@ test.describe('account groups', () => {
     await expect(screen).not.toContainText('owed');
     await expect(screen).toContainText('Everyday');
   });
+
+  test('a card carries its terms, and only a card is asked for them', async ({ page }) => {
+    await openGroups(page);
+    await addGroup(page, 'Credit cards', 'Credit card');
+    await addGroup(page, 'Everyday', 'Default');
+
+    await goToTab(page, 'Accounts', Screen.accounts);
+    await tapAdd(page, Screen.accounts);
+    const modal = page.locator('ion-modal.show-modal');
+
+    // Nothing about cards until the account is filed as one.
+    await expect(modal.locator('ion-input[label="Credit limit"]')).toHaveCount(0);
+
+    await fillField(page, 'Name', 'Visa');
+    await chooseOption(page, 'Group', 'Credit cards');
+    await expect(modal.locator('ion-input[label="Credit limit"]')).toBeVisible();
+
+    await fillField(page, 'Opening balance', '-1240.00');
+    await fillField(page, 'Credit limit', '5000.00');
+    await fillField(page, 'Statement closes on day', '25');
+    await fillField(page, 'Payment due on day', '15');
+    await tap(page, 'Save');
+
+    const screen = page.locator(Screen.accounts);
+    await expect(screen.getByRole('heading', { name: 'Visa' })).toBeVisible();
+    await expect(screen).toContainText('$3,760.00 available');
+    await expect(screen).toContainText('due');
+
+    // Moving it out of the cards group takes the terms with it.
+    await screen.getByRole('heading', { name: 'Visa' }).click();
+    await chooseOption(page, 'Group', 'Everyday');
+    await tap(page, 'Save');
+
+    await expect(screen).not.toContainText('available');
+  });
+
+  test('the terms survive a lock and unlock', async ({ page }) => {
+    await openGroups(page);
+    await addGroup(page, 'Credit cards', 'Credit card');
+
+    await goToTab(page, 'Accounts', Screen.accounts);
+    await tapAdd(page, Screen.accounts);
+    await fillField(page, 'Name', 'Visa');
+    await chooseOption(page, 'Group', 'Credit cards');
+    await fillField(page, 'Opening balance', '-100.00');
+    await fillField(page, 'Credit limit', '1000.00');
+    await tap(page, 'Save');
+    // Wait for the write to be on screen before reloading: a reload that lands
+    // mid-write loses it, which is its own open question in the gaps table.
+    await expect(page.locator(Screen.accounts).getByRole('heading', { name: 'Visa' })).toBeVisible();
+
+    await page.reload();
+    await waitForScreen(page, Screen.vault);
+    await fillField(page, 'Passphrase', 'correct horse battery staple', Screen.vault);
+    await tap(page, 'Unlock', Screen.vault);
+    await waitForScreen(page, Screen.dashboard);
+    await goToTab(page, 'Accounts', Screen.accounts);
+
+    await expect(page.locator(Screen.accounts)).toContainText('$900.00 available');
+  });
 });

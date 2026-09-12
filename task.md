@@ -31,7 +31,7 @@ Every task follows the same loop, and none of it is optional:
 | 6 | Release readiness | ✅ Done |
 | 7 | Account groups & credit cards | ⏳ In progress |
 
-Tests today: **640 client unit**, **71 end-to-end**, **95 Go**.
+Tests today: **678 client unit**, **73 end-to-end**, **95 Go**.
 
 ---
 
@@ -931,17 +931,48 @@ negative, which meant a card in credit — the good case — turned red while a
 £1,240 debt did not. Danger is now for an overdrawn ordinary account, and a card
 section is left alone in both directions.
 
-### 7.4 Card terms
+### 7.4 Card terms ✅
 
-- [ ] `creditLimit`, `statementDay`, `dueDay` on `Account`, all optional, all
+- [x] `creditLimit`, `statementDay`, `dueDay` on `Account`, all optional, all
       meaningless unless the account's group is `credit-card`
-- [ ] Editor shows these fields only for an account in a credit-card group
-- [ ] Available credit = limit − balance owed; shown on the account
+- [x] `core/cards/statement.ts`, pure: day-of-month clamping, the last statement
+      to have closed, the due date that follows it, and available credit
+- [x] Editor shows these fields only for an account in a credit-card group, and
+      follows the picker live rather than needing a save and reopen
+- [x] A card row reads "$3,760.00 available · due Sep 15", each half appearing
+      only if its terms are recorded
 
-**Tests**
-- [ ] Unit: statement and due date resolution across month lengths — a
-      statement day of 31 in February, a due day that falls in the next month
-- [ ] Component: the fields appear and disappear with the group type
+**Tests** (38 added, 640 → 678; plus 2 end-to-end, 71 → 73)
+- [x] Unit: clamping (31st in February, leap years, 2100), the last statement
+      including the day itself and stepping back over a year boundary, due dates
+      in the same month and the next, never on the closing day, clamped into a
+      shorter month, and a swept property that a bill is never due before the
+      statement it belongs to; available credit including over-limit and a card
+      in credit; null when no limit is recorded
+- [x] Component: the fields appear only for a credit-card group, not for a debit
+      one, and follow the picker live; terms save; blank leaves them unset; a
+      limit of zero and a day outside the calendar are ignored; the terms are
+      cleared when an account stops being a card
+- [x] e2e: a card carries its terms end to end, the fields are absent until the
+      group makes it a card, and the terms survive a lock and unlock
+
+**The due date is "the next one after", not a special case.** A card closing on
+the 25th and due on the 15th is due next month; one closing on the 1st and due
+on the 20th is due this month. Stating the rule as the next date carrying the
+due day, strictly after the close, covers both — and cannot produce a bill due
+before the statement exists, which a test sweeps a year of closings to check.
+
+**A day past the end of a short month falls on that month's last day.** A card
+closing on the 31st closes on the 28th in February rather than skipping the
+cycle, and the editor says so under the fields.
+
+**Terms are cleared when an account stops being a card.** A limit left behind on
+a current account would be read as real by anything that later asks what credit
+is available.
+
+**"Unknown" and "nothing left" must not look the same.** `availableCredit`
+returns null rather than zero when no limit is recorded, so a card with no limit
+says nothing about available credit instead of implying it is exhausted.
 
 ### 7.5 Pay the bill
 

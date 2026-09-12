@@ -1,4 +1,4 @@
-import { Component, effect, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Account, AccountKind } from '../../core/models/domain';
 import { AccountGroupsService } from '../../core/repositories/account-groups.service';
@@ -120,6 +120,48 @@ const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'BDT', 'AUD', 'CAD', 'JPY', 'SGD
           />
         </ion-item>
 
+        @if (isCreditCard()) {
+          <ion-item>
+            <ion-input
+              label="Credit limit"
+              labelPlacement="stacked"
+              type="text"
+              inputmode="decimal"
+              placeholder="0.00"
+              [ngModel]="creditLimit()"
+              (ngModelChange)="creditLimit.set($event)"
+            />
+          </ion-item>
+
+          <ion-item>
+            <ion-input
+              label="Statement closes on day"
+              labelPlacement="stacked"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="31"
+              placeholder="25"
+              [ngModel]="statementDay()"
+              (ngModelChange)="statementDay.set($event)"
+            />
+          </ion-item>
+
+          <ion-item>
+            <ion-input
+              label="Payment due on day"
+              labelPlacement="stacked"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="31"
+              placeholder="15"
+              [ngModel]="dueDay()"
+              (ngModelChange)="dueDay.set($event)"
+            />
+          </ion-item>
+        }
+
         @if (existing()) {
           <ion-item>
             <ion-toggle [ngModel]="archived()" (ngModelChange)="archived.set($event)">
@@ -128,6 +170,15 @@ const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'BDT', 'AUD', 'CAD', 'JPY', 'SGD
           </ion-item>
         }
       </ion-list>
+
+      @if (isCreditCard()) {
+        <ion-item lines="none">
+          <ion-note>
+            A day past the end of a short month falls on that month's last day, so 31 means the
+            31st where there is one and the 28th in February.
+          </ion-note>
+        </ion-item>
+      }
 
       <ion-item lines="none">
         <ion-note>
@@ -164,7 +215,19 @@ export class AccountEditorComponent {
   readonly currency = signal('USD');
   readonly openingBalance = signal('0.00');
   readonly groupId = signal<string | null>(null);
+  readonly creditLimit = signal('');
+  readonly statementDay = signal<number | null>(null);
+  readonly dueDay = signal<number | null>(null);
   readonly archived = signal(false);
+
+  /**
+   * Card terms are shown only where they mean something: an account filed in a
+   * credit-card group. They follow the picker live, so choosing that group
+   * reveals them without a save-and-reopen.
+   */
+  readonly isCreditCard = computed(
+    () => this.groups.byId(this.groupId())?.type === 'credit-card',
+  );
   readonly error = signal<string | null>(null);
 
   constructor() {
@@ -178,6 +241,13 @@ export class AccountEditorComponent {
         // A group deleted elsewhere reads as no group rather than as a dangling
         // selection the picker could not display.
         this.groupId.set(this.groups.byId(account.groupId)?.id ?? null);
+        this.creditLimit.set(
+          typeof account.creditLimit === 'number'
+            ? formatAmount(account.creditLimit, account.currency)
+            : '',
+        );
+        this.statementDay.set(account.statementDay ?? null);
+        this.dueDay.set(account.dueDay ?? null);
         this.archived.set(account.archived);
       } else {
         this.name.set('');
@@ -187,6 +257,9 @@ export class AccountEditorComponent {
         this.currency.set(this.accounts.active()[0]?.currency ?? 'USD');
         this.openingBalance.set('0.00');
         this.groupId.set(null);
+        this.creditLimit.set('');
+        this.statementDay.set(null);
+        this.dueDay.set(null);
         this.archived.set(false);
       }
       this.error.set(null);
@@ -197,6 +270,7 @@ export class AccountEditorComponent {
     this.error.set(null);
     try {
       const existing = this.existing();
+      const card = this.isCreditCard();
       const saved = await this.accounts.save({
         id: existing?.id ?? crypto.randomUUID(),
         name: this.name().trim(),
@@ -204,6 +278,12 @@ export class AccountEditorComponent {
         currency: this.currency(),
         openingBalance: parseAmount(this.openingBalance() || '0', this.currency()),
         groupId: this.groupId(),
+        // Written only for a card, and cleared when an account stops being one:
+        // a limit left behind on a current account would be read as real by
+        // anything that asks what credit is available.
+        creditLimit: card ? parseOptionalAmount(this.creditLimit(), this.currency()) : undefined,
+        statementDay: card ? dayOrUndefined(this.statementDay()) : undefined,
+        dueDay: card ? dayOrUndefined(this.dueDay()) : undefined,
         archived: this.archived(),
         colour: existing?.colour ?? '#3880ff',
         icon: KINDS.find((k) => k.value === this.kind())?.icon ?? 'wallet-outline',
@@ -214,4 +294,20 @@ export class AccountEditorComponent {
       this.error.set((error as Error).message);
     }
   }
+}
+
+/** An amount field that is allowed to be blank: blank means "not recorded". */
+function parseOptionalAmount(input: string, currency: string): number | undefined {
+  const trimmed = input.trim();
+  if (!trimmed) return undefined;
+  const amount = parseAmount(trimmed, currency);
+  // A limit is a capacity, not a balance; zero and negatives are not limits.
+  return amount > 0 ? amount : undefined;
+}
+
+/** A day-of-month field, ignored unless it is one. */
+function dayOrUndefined(value: number | string | null): number | undefined {
+  if (value === null || value === '') return undefined;
+  const day = Math.trunc(Number(value));
+  return Number.isFinite(day) && day >= 1 && day <= 31 ? day : undefined;
 }

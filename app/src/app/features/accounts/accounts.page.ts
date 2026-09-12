@@ -12,6 +12,7 @@ import {
   walletOutline,
 } from 'ionicons/icons';
 import { AccountSection, buildSections, displayBalance } from '../../core/accounts/sections';
+import { availableCredit, dueDateFor, hasCycle, lastStatementDate } from '../../core/cards/statement';
 import { Account } from '../../core/models/domain';
 import { convert } from '../../core/money/conversion';
 import { AccountGroupsService } from '../../core/repositories/account-groups.service';
@@ -117,7 +118,7 @@ import {
                 <ion-icon slot="start" [name]="account.icon" [style.color]="account.colour" />
                 <ion-label>
                   <h3>{{ account.name }}</h3>
-                  <p>{{ account.kind }}</p>
+                  <p>{{ subtitle(account, section) }}</p>
                 </ion-label>
                 <ion-note slot="end" [color]="alarming(account, section) ? 'danger' : undefined">
                   {{ shown(account, section) | money: account.currency }}
@@ -209,6 +210,31 @@ export class AccountsPage {
 
   balanceOf(account: Account): number {
     return this.accounts.balances().get(account.id) ?? account.openingBalance;
+  }
+
+  /**
+   * The line under an account's name.
+   *
+   * For a card this is what the terms are for: how much credit is left and when
+   * the bill is due. Each part appears only if its terms are recorded — a card
+   * with no limit says nothing about available credit rather than implying one.
+   */
+  subtitle(account: Account, section: AccountSection): string {
+    if (!section.owed) return account.kind;
+
+    const parts: string[] = [];
+
+    const available = availableCredit(this.balanceOf(account), account.creditLimit);
+    if (available !== null) {
+      parts.push(`${formatMoney(available, account.currency)} available`);
+    }
+
+    if (hasCycle(account)) {
+      const due = dueDateFor(account.dueDay!, lastStatementDate(account.statementDay!));
+      parts.push(`due ${formatDueDate(due)}`);
+    }
+
+    return parts.length ? parts.join(' · ') : account.kind;
   }
 
   /** What the row shows: money owed on a card, money held everywhere else. */
@@ -315,4 +341,17 @@ export class AccountsPage {
       trendingUpOutline,
     });
   }
+}
+
+/**
+ * A short date to sit under an account name — "15 Apr", or "Apr 15" where the
+ * viewer's locale puts the month first. Day and month only: the year would be
+ * noise on a bill due within the next few weeks.
+ */
+function formatDueDate(date: string, locale?: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(locale, {
+    day: 'numeric',
+    month: 'short',
+  });
 }

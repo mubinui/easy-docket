@@ -199,4 +199,75 @@ describe('AccountsPage grouping', () => {
     expect(page.sections()[0].accounts.map((a) => a.id)).toEqual(['a-live']);
     expect(page.archived().map((a) => a.id)).toEqual(['a-old']);
   });
+
+  describe('card terms on the row', () => {
+    async function renderCard(overrides: Record<string, unknown>): Promise<void> {
+      await db.accountGroups.put(
+        anAccountGroup({ id: 'g-cards', name: 'Cards', type: 'credit-card' }),
+      );
+      await db.accounts.put(
+        anAccount({ id: 'a-visa', name: 'Visa', groupId: 'g-cards', ...overrides }),
+      );
+      await render(1, 1);
+    }
+
+    function visa() {
+      const section = page.sections()[0];
+      return { account: section.accounts[0], section };
+    }
+
+    it('shows what credit is left', async () => {
+      await renderCard({ openingBalance: -1_240_00, creditLimit: 5_000_00 });
+
+      const { account, section } = visa();
+      expect(page.subtitle(account, section)).toContain('$3,760.00 available');
+      expect(text()).toContain('$3,760.00 available');
+    });
+
+    it('says nothing about credit when no limit is recorded', async () => {
+      // A card with no limit must not imply one.
+      await renderCard({ openingBalance: -1_240_00 });
+
+      const { account, section } = visa();
+      expect(page.subtitle(account, section)).not.toContain('available');
+    });
+
+    it('shows when the bill is due', async () => {
+      await renderCard({ statementDay: 25, dueDay: 15 });
+
+      // The order of day and month is the viewer's locale's business, so the
+      // assertion only insists that both are there.
+      const { account, section } = visa();
+      expect(page.subtitle(account, section)).toMatch(/due (\d+ \w+|\w+ \d+)/);
+    });
+
+    it('needs both days before it says anything about a due date', async () => {
+      await renderCard({ statementDay: 25 });
+
+      const { account, section } = visa();
+      expect(page.subtitle(account, section)).not.toContain('due');
+    });
+
+    it('shows both together', async () => {
+      await renderCard({ openingBalance: -100_00, creditLimit: 1_000_00, statementDay: 1, dueDay: 20 });
+
+      const { account, section } = visa();
+      expect(page.subtitle(account, section)).toMatch(/\$900\.00 available · due /);
+    });
+
+    it('falls back to the account kind when a card has no terms at all', async () => {
+      await renderCard({ kind: 'card' });
+
+      const { account, section } = visa();
+      expect(page.subtitle(account, section)).toBe('card');
+    });
+
+    it('leaves an ordinary account showing its kind', async () => {
+      await db.accounts.put(anAccount({ id: 'a-1', kind: 'bank', groupId: null }));
+      await render(1);
+
+      const section = page.sections()[0];
+      expect(page.subtitle(section.accounts[0], section)).toBe('bank');
+    });
+  });
 });
