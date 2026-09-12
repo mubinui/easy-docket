@@ -2,6 +2,7 @@
 // Buffer global as soon as it does anything.
 import './buffer-polyfill';
 
+import { Capacitor } from '@capacitor/core';
 import FS from '@isomorphic-git/lightning-fs';
 import * as git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
@@ -248,7 +249,45 @@ export class GitAdapter implements SyncAdapter {
     const retryable =
       status === undefined || status >= 500 || status === 429 || error.code === 'HttpError';
 
-    return new SyncTransportError(`Git operation failed: ${error.message}`, retryable, cause);
+    // A browser talking to a public Git host without a proxy fails for a reason
+    // the underlying error never names: the host sends no CORS headers, so the
+    // response is unreadable, and an authenticated request never leaves at all
+    // because the preflight is refused. Reporting the raw status sends people
+    // hunting for a token problem they do not have.
+    const hint = this.corsHint();
+    const message = hint
+      ? `${hint} (the underlying failure was: ${error.message})`
+      : `Git operation failed: ${error.message}`;
+
+    return new SyncTransportError(message, retryable, cause);
+  }
+
+  /**
+   * The explanation, when a missing CORS proxy is the likely cause.
+   *
+   * Only for a browser: inside the Android WebView requests are not subject to
+   * CORS and a proxy is unnecessary. Only for a remote host: a Git server on
+   * this machine may well send its own headers, which is how the test suite
+   * reaches one.
+   */
+  private corsHint(): string | null {
+    if (this.target.corsProxy.trim()) return null;
+    if (Capacitor.isNativePlatform()) return null;
+
+    let host: string;
+    try {
+      host = new URL(this.target.repoUrl).hostname;
+    } catch {
+      return null;
+    }
+    if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return null;
+
+    return (
+      `A browser cannot reach ${host} directly: Git hosts send no CORS headers, ` +
+      'so the request is blocked before it is even authenticated. Set a CORS proxy ' +
+      'in the sync settings — https://cors.isomorphic-git.org, or one you run ' +
+      'yourself — or sync from the Android app, which does not need one.'
+    );
   }
 }
 

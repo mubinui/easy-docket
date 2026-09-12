@@ -34,7 +34,7 @@ Every task follows the same loop, and none of it is optional:
 | 9 | Assets and liabilities | ✅ Done |
 | 10 | Starter accounts | ✅ Done |
 
-Tests today: **798 client unit**, **84 end-to-end**, **95 Go**.
+Tests today: **806 client unit**, **84 end-to-end**, **95 Go**.
 
 ---
 
@@ -1047,6 +1047,7 @@ Real, currently unaddressed, and each one has a home above.
 | ~~A deleted transaction can come back if the app reloads immediately after~~ | — | ✅ Closed. **It was the test, not the app** — see "The flaky delete" below |
 | The accounts list shows `kind` as its stored value | Cosmetic: a row reads "bank" rather than "Bank account" | Open, small. Now that `AccountKind` is documented as presentation, showing the raw enum is the one place that still contradicts it — the label belongs beside the icon it already picks |
 | A loan has no "Pay" flow | A repayment is recorded by hand as a transfer, which works but is more typing | Open. The payment sheet is card-shaped ("statement balance", "bill"); generalising it to repayments is a small, deliberate piece of work |
+| Git sync to GitHub needs a CORS proxy on the web | Not fixable in the app: GitHub sends no `Access-Control-Allow-Origin` on its Git endpoints, and refuses the preflight an authenticated request needs (`OPTIONS` → 405). The adapter now says so by name instead of reporting the raw HTTP failure | Open by nature. A proxy, the Android app, or the Go server / S3 avoids it |
 | No rate limiting on the server | A leaked token can be used to exhaust disk | Server hardening, unscheduled — quotas blunt it today |
 | Single currency assumed in UI totals | Dashboard uses the first account's currency | Phase 5 |
 | Category deletion leaves transactions uncategorised | Silent, no warning | Small fix, fold into 2.3 |
