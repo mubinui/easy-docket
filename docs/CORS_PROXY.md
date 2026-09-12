@@ -69,62 +69,166 @@ through it, as any host can.
 
 ---
 
-## Deploy it
+## Deploy it, step by step
 
-### 1. Prerequisites
+Ten steps, about five minutes. Every command is run from the `cors-proxy`
+directory unless it says otherwise, and each one shows what you should see, so
+you can tell a working step from a step that only looked like it worked.
 
-- A Cloudflare account (the free plan is enough)
-- Node.js 20 or newer
+### Step 1 — Check what you need
 
-### 2. Configure
-
-Edit `cors-proxy/wrangler.toml`:
-
-```toml
-name = "easy-docket-cors-proxy"
-main = "src/worker.js"
-compatibility_date = "2026-09-01"
-
-[vars]
-ALLOWED_ORIGINS = "https://docket.xiidea.net"
-ALLOWED_HOSTS = "github.com"
+```console
+$ node --version
+v22.22.3
 ```
 
-| Variable | Meaning |
-|---|---|
-| `ALLOWED_ORIGINS` | Comma-separated origins allowed to use the proxy. Empty means any origin. Set it to your app's origin |
-| `ALLOWED_HOSTS` | Comma-separated Git hosts it will forward to. Subdomains of a listed host are included. **Unset means nothing is forwarded** |
+Node 20 or newer. You also need a Cloudflare account; the free plan is enough,
+and you can create one during step 6 if you do not have one yet.
 
-`ALLOWED_HOSTS` fails closed deliberately: a proxy that forwards anywhere is an
-open relay on your account, and it will be found and used.
+### Step 2 — Get the code and open the right directory
 
-If you use the app from more than one place — the deployed site and
-`http://localhost:4200` while developing — list both:
+```console
+$ git clone https://github.com/xiidea/easy-docket.git
+$ cd easy-docket/cors-proxy
+```
+
+Already have the repository? Just `cd easy-docket/cors-proxy`.
+
+### Step 3 — Install
+
+```console
+$ npm install
+
+added 80 packages, and audited 81 packages in 4s
+found 0 vulnerabilities
+```
+
+This installs Wrangler — Cloudflare's deployment tool — and the test runner.
+The worker itself has no dependencies.
+
+### Step 4 — Run the tests
+
+Before deploying anything, confirm the code you are about to put on the internet
+behaves:
+
+```console
+$ npm test
+
+ Test Files  1 passed (1)
+      Tests  25 passed (25)
+```
+
+Most of those tests are about what the proxy **refuses** to do.
+
+### Step 5 — Decide your configuration
+
+Open `wrangler.toml`. There are three things you may want to change, and the
+defaults are fine for GitHub:
+
+| Setting | Default | Change it when |
+|---|---|---|
+| `name` | `easy-docket-cors-proxy` | You want a different URL |
+| `ALLOWED_HOSTS` | `github.com` | Your repository is on GitLab, Bitbucket or your own server |
+| `ALLOWED_ORIGINS` | *(empty — any origin)* | You want only your app to be able to use the proxy |
+
+**If your repository is on GitHub, change nothing and go to step 6.**
+
+Otherwise, edit the values. They are comma-separated:
 
 ```toml
+ALLOWED_HOSTS = "gitlab.com,git.example.com"
 ALLOWED_ORIGINS = "https://docket.xiidea.net,http://localhost:4200"
 ```
 
-### 3. Deploy
+An origin is the scheme, host and port — `https://docket.xiidea.net`, with no
+path and no trailing slash. If you use the app from a phone *and* a laptop,
+that is still one origin: the site's address, not the device's.
+
+> **Why `ALLOWED_HOSTS` cannot be left empty.** An empty list forwards nothing.
+> A proxy that will reach any host is an open relay running on your account and
+> your quota, and open relays get found.
+
+### Step 6 — Sign in to Cloudflare
 
 ```console
-$ cd cors-proxy
-$ npm install
-$ npx wrangler login      # opens a browser once
+$ npm run login
+```
+
+A browser opens and asks you to authorise Wrangler. If you do not have an
+account yet, create one on that page — it is free and takes a minute — then
+authorise. The terminal confirms when it has worked.
+
+Then check which account you are about to deploy into, which matters if you
+have more than one:
+
+```console
+$ npm run whoami
+```
+
+It prints the email and account the token belongs to. Before you log in it
+fails instead, with `Not logged in.` — so this is also how you tell whether
+step 6 worked.
+
+<details>
+<summary>Deploying from a server or CI, without a browser</summary>
+
+Create an API token in the Cloudflare dashboard with the **Edit Cloudflare
+Workers** template, then:
+
+```console
+$ export CLOUDFLARE_API_TOKEN=your-token
+$ export CLOUDFLARE_ACCOUNT_ID=your-account-id
 $ npm run deploy
 ```
 
-Wrangler prints the URL it deployed to:
+Wrangler uses those instead of the browser login.
+</details>
+
+### Step 7 — Check before you upload
+
+```console
+$ npm run check
+
+Total Upload: 6.59 KiB / gzip: 2.31 KiB
+Your Worker has access to the following bindings:
+Binding                                 Resource
+env.ALLOWED_HOSTS ("github.com")        Environment Variable
+env.ALLOWED_ORIGINS ("")                Environment Variable
+
+--dry-run: exiting now.
+```
+
+This compiles and validates without uploading. **Read the two bindings** — they
+are the settings your proxy will actually run with. If they are not what you
+intended, go back to step 5.
+
+### Step 8 — Deploy
+
+```console
+$ npm run deploy
+```
+
+Wrangler uploads the worker and finishes by printing the URL it is now served
+from, of the form:
 
 ```
 https://easy-docket-cors-proxy.<your-subdomain>.workers.dev
 ```
 
-That URL is what goes in the app.
+`<your-subdomain>` is assigned to your Cloudflare account; the first part is the
+`name` from `wrangler.toml`.
 
-### 4. Check it before trusting it
+**That URL is what goes in the app.** Copy it.
 
-Answering the preflight is the whole job, so test that first:
+Lost it later? It is in the Cloudflare dashboard under **Workers & Pages**, or
+run `npm run deploy` again and it prints it.
+
+### Step 9 — Verify the deployment
+
+Three checks. Replace `<your-worker>` with the URL from step 8.
+
+**a. It answers the preflight** — the thing GitHub refuses, and the reason this
+proxy exists:
 
 ```console
 $ curl -s -D - -o /dev/null -X OPTIONS \
@@ -132,31 +236,38 @@ $ curl -s -D - -o /dev/null -X OPTIONS \
     -H 'Access-Control-Request-Headers: authorization' \
     'https://<your-worker>/github.com/you/vault.git/info/refs?service=git-upload-pack' \
   | grep -iE '^HTTP/|access-control'
+
 HTTP/2 204
 access-control-allow-origin: https://docket.xiidea.net
 access-control-allow-headers: authorization
 access-control-allow-methods: GET, POST, OPTIONS
 ```
 
-Then a real request, against any public repository:
+**b. It forwards a real Git request** — any public repository will do, so you
+can test this before involving your own token:
 
 ```console
 $ curl -s 'https://<your-worker>/github.com/git/git.git/info/refs?service=git-upload-pack' \
     -H 'Origin: https://docket.xiidea.net' | head -c 40
+
 001e# service=git-upload-pack
 ```
 
-And confirm it refuses what it should:
+**c. It refuses what it should.** A proxy that forwards anywhere is the failure
+mode worth checking for:
 
 ```console
 $ curl -s -o /dev/null -w '%{http_code}\n' \
     'https://<your-worker>/evil.example/x.git/info/refs?service=git-upload-pack'
+
 403
 ```
 
-### 5. Point the app at it
+If (a) and (b) work and (c) prints `403`, the proxy is correct.
 
-**Settings → Destination → Git repository**
+### Step 10 — Point the app at it
+
+In Easy Docket: **Settings → Destination → Git repository**
 
 | Field | Value |
 |---|---|
@@ -164,14 +275,15 @@ $ curl -s -o /dev/null -w '%{http_code}\n' \
 | Branch | `main` |
 | Username | anything — GitHub ignores it when a token is used |
 | Access token | a GitHub personal access token (below) |
-| CORS proxy | `https://easy-docket-cors-proxy.<your-subdomain>.workers.dev` |
+| CORS proxy | the URL from step 8 |
 
-Then **Test connection**. It authenticates without writing, so a mistake shows
-up here rather than as a silent background failure days later.
+Press **Test connection**. It authenticates without writing, so a mistake shows
+up here rather than as a silent background failure days later. Then **Save**, and
+sync once to confirm a commit lands in the repository.
 
 #### The access token
 
-Fine-grained token (preferred), on that one repository:
+Fine-grained token (preferred), scoped to that one repository:
 
 - **Contents: Read and write**
 
@@ -180,6 +292,37 @@ Classic token:
 - **`repo`** scope
 
 An empty repository is fine — the first sync initialises it.
+
+---
+
+## Changing the configuration later
+
+**Edit and redeploy** — the version in `wrangler.toml` stays the record of what
+is running:
+
+```console
+$ npm run deploy
+```
+
+**Or override for a single deploy**, without editing the file:
+
+```console
+$ npx wrangler deploy \
+    --var ALLOWED_HOSTS:gitlab.com \
+    --var ALLOWED_ORIGINS:https://docket.xiidea.net
+```
+
+**Or from the dashboard**, with no terminal at all: **Workers & Pages → your
+worker → Settings → Variables and Secrets**. Edit and deploy there. Note that
+the next `npm run deploy` will overwrite dashboard edits with whatever is in
+`wrangler.toml`, so keep the two in step.
+
+Deploying a second, separate proxy — one for work, one for personal — needs no
+second copy of the code:
+
+```console
+$ npx wrangler deploy --name docket-proxy-work --var ALLOWED_HOSTS:git.work.example
+```
 
 ---
 
@@ -217,14 +360,16 @@ affected.
 
 | What you see | What it means |
 |---|---|
-| "A browser cannot reach github.com directly…" | No CORS proxy is set in the app. That message is the app recognising this exact situation |
-| `403` and "This proxy does not forward to github.com" | `ALLOWED_HOSTS` does not list the host. Unset means nothing is forwarded |
-| `403` and "Origin … is not allowed" | `ALLOWED_ORIGINS` does not list the app's origin. Include the scheme and any port |
-| `400` and "Expected a URL of the form…" | Something other than the app called the worker, or the CORS proxy field has a trailing path. It should be a bare origin |
-| `401` from GitHub | Now a genuine credential problem: wrong token, expired, or missing Contents write |
+| `npm run login` never finishes | The browser did not reach Cloudflare. Run `npx wrangler login` directly — it prints a URL you can open by hand |
+| `Not logged in.` | Step 6 did not complete. Run `npm run login` again, then `npm run whoami` |
+| `npm run deploy` asks you to select an account | You are a member of more than one. Pick the one you want, or set `CLOUDFLARE_ACCOUNT_ID` |
+| The app still says "A browser cannot reach github.com directly…" | The CORS proxy field is empty or was not saved. That message is the app recognising this exact situation |
+| `403` — "This proxy does not forward to github.com" | `ALLOWED_HOSTS` does not list the host. Check step 5, then redeploy — the value in `npm run check` is the one that counts |
+| `403` — "Origin … is not allowed" | `ALLOWED_ORIGINS` does not list your app's origin. Include the scheme and any port, with no trailing slash |
+| `400` — "Expected a URL of the form…" | The CORS proxy field has a path or trailing slash on it. It should be the bare URL from step 8 |
+| `401` from GitHub | A genuine credential problem now: the token is wrong, expired, or lacks Contents write |
 | "Only Git smart-HTTP endpoints are forwarded" | Working as intended — this proxy is not a general-purpose one |
-
----
+| Sync works on Android but not in the browser | Expected if no proxy is configured. Android needs none |
 
 ## How it works
 

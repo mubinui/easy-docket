@@ -5,10 +5,13 @@
   "type": "module",
   "description": "Cloudflare Worker that lets a browser speak Git to hosts that send no CORS headers",
   "scripts": {
-    "dev": "wrangler dev",
+    "test": "vitest run",
+    "check": "wrangler deploy --dry-run",
+    "login": "wrangler login",
     "deploy": "wrangler deploy",
+    "whoami": "wrangler whoami",
     "tail": "wrangler tail",
-    "test": "vitest run"
+    "dev": "wrangler dev"
   },
   "devDependencies": {
     "vitest": "^4.1.11",

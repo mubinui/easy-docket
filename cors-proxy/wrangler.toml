@@ -1,16 +1,42 @@
+# Easy Docket CORS proxy — Cloudflare Worker configuration.
+#
+# Everything you need to change is in this file. The defaults below deploy a
+# working proxy for GitHub; step 5 of docs/CORS_PROXY.md explains how to tighten
+# them, and you can change them later without touching the code.
+
+# The Worker's name. It becomes part of the URL you will paste into the app:
+#   https://<name>.<your-subdomain>.workers.dev
+# Change it if you want a different URL, or pass `--name` when deploying.
 name = "easy-docket-cors-proxy"
+
 main = "src/worker.js"
+
+# Workers run ES modules directly, so there is no build step and nothing sits
+# between the file you can read and the code that runs.
 compatibility_date = "2026-09-01"
 
-# Workers run ES modules directly, so there is no build step and nothing to
-# audit between the file you read and the code that runs.
-
 [vars]
-# Origins allowed to use the proxy. Empty means any origin, which is usually
-# what a worker on its own URL wants; naming your app is one line stricter.
-ALLOWED_ORIGINS = "https://docket.xiidea.net"
 
-# Upstream hosts the proxy will forward to. Unset means nothing is forwarded —
-# this fails closed on purpose, so a fresh deploy is never an open relay.
-# Subdomains of a listed host are allowed (`github.com` covers `www.github.com`).
+# Which Git hosts the proxy will forward to, comma-separated.
+# Subdomains of a listed host are included, so "github.com" also covers
+# "www.github.com". Anything not listed is refused.
+#
+#   GitHub        github.com
+#   GitLab        gitlab.com
+#   Bitbucket     bitbucket.org
+#   Self-hosted   git.example.com
+#
+# Leave this empty and the proxy forwards nothing at all. That is deliberate:
+# a proxy that will reach any host is an open relay running on your account.
 ALLOWED_HOSTS = "github.com"
+
+# Which origins may use the proxy, comma-separated. An origin is the scheme,
+# host and port of the site — no path, no trailing slash:
+#
+#   ALLOWED_ORIGINS = "https://docket.xiidea.net"
+#   ALLOWED_ORIGINS = "https://docket.xiidea.net,http://localhost:4200"
+#
+# Empty means any origin, which is the setting that works everywhere without
+# thinking about it. Naming your own origin is one line better: it stops another
+# site from spending your worker's request quota.
+ALLOWED_ORIGINS = ""
