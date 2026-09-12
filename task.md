@@ -31,7 +31,7 @@ Every task follows the same loop, and none of it is optional:
 | 6 | Release readiness | ✅ Done |
 | 7 | Account groups & credit cards | ⏳ In progress |
 
-Tests today: **610 client unit**, **69 end-to-end**, **95 Go**.
+Tests today: **640 client unit**, **71 end-to-end**, **95 Go**.
 
 ---
 
@@ -889,20 +889,47 @@ account" button, which is a *sibling* of the editor, off the bottom of the
 sheet. `editor-layout.spec.ts` asserts the geometry directly and fails on all
 five editors when the rule is removed.
 
-### 7.3 Accounts screen grouped
+### 7.3 Accounts screen grouped ✅
 
-- [ ] Accounts list rendered by group, with a per-group subtotal in the
-      reporting currency, using the same unconverted-currency handling as net
-      worth
-- [ ] Ungrouped accounts under a final unnamed section, not a fake group
-- [ ] A `credit-card` group reads as money **owed**: a negative balance shows as
-      a positive amount owed, and a subtotal is a total debt
-- [ ] Net worth is unchanged — a card debt already subtracts
+- [x] `core/accounts/sections.ts`, pure: grouping, per-section subtotals in the
+      reporting currency, and the owed framing
+- [x] Accounts list rendered by group with a subtotal on each heading, using the
+      same missing-rate handling as net worth
+- [x] Ungrouped accounts under a final "Not in a group" section, not a fake group
+- [x] A `credit-card` group reads as money **owed**: a debt shows as a positive
+      amount against the word "owed", and the subtotal is the total debt
+- [x] Net worth is unchanged — a card debt already subtracts there
 
-**Tests**
-- [ ] Component: grouping, subtotals, the owed framing, ungrouped section
-- [ ] e2e: create a group, put an account in it, see it under that heading with
-      the right subtotal
+**Tests** (30 added, 610 → 640; plus 2 end-to-end, 69 → 71)
+- [x] Unit: `displayBalance` both ways including a card in credit; grouping,
+      group order, the ungrouped tail, an account with no `groupId` and one
+      pointing at an unknown group, empty groups omitted, subtotals, the
+      opening-balance fallback, credit vs debit framing, conversion, missing
+      rates named once, and a foreign card debt converted before it is flipped
+- [x] Component: headings and membership, ungrouped last, subtotals on screen,
+      the owed framing, no danger colour on a card, danger kept for an overdrawn
+      ordinary account, net worth unmoved by the flip, the excluded-currency
+      note, a rate arriving, empty groups hidden, archived accounts excluded
+- [x] e2e: a grouped screen with subtotals and net worth, and an account moving
+      between groups from its editor
+
+**The flip is display-only, and there is a test that says so.** A card's balance
+is negative in the ledger and that is correct — net worth has to subtract it.
+`displayBalance` flips the sign for the row and the subtotal only, so the screen
+reads like a statement while the arithmetic underneath is untouched.
+
+**An empty group is not shown.** The accounts screen answers "where is my
+money"; a heading with nothing under it answers nothing. The group still exists
+and is managed on its own screen.
+
+**The ungrouped section has no group rather than a synthetic one.** An invented
+"Other" group would turn up in the group picker and in the management screen,
+where nobody put it.
+
+**A card is never coloured red.** The first version coloured whatever displayed
+negative, which meant a card in credit — the good case — turned red while a
+£1,240 debt did not. Danger is now for an overdrawn ordinary account, and a card
+section is left alone in both directions.
 
 ### 7.4 Card terms
 
@@ -945,6 +972,7 @@ Real, currently unaddressed, and each one has a home above.
 | ~~S3 adapter has no integration test~~ | — | ✅ Closed: MinIO in Docker. Passed first time |
 | `remove` is unproven against S3 and Git | Pruning is covered against the Go server and by unit tests, but the S3 and Git delete paths have not run against a real remote | Open. Needs a snapshot to trigger, which needs 200 operations — worth a seeded fixture rather than driving the UI |
 | A deleted transaction can come back if the app reloads immediately after | Real, and about data the user asked to be gone | Open, its own task. `recurring.spec.ts` "a deleted occurrence stays deleted" fails roughly 3 runs in 8, **before and after Phase 7 alike**. On a failing run the operation log holds only the `put` — no tombstone — and the row is still in the table, so the delete was lost rather than undone. The delete path is properly awaited (`remove()` → `TransactionsService.remove` → `LedgerService.remove`), which points at the write being cut off by the reload rather than at missing sequencing. Not guessed at: a wrong fix here silently resurrects financial records |
+| The accounts list shows `kind` as its stored value | Cosmetic: a row reads "bank" rather than "Bank account" | Open, small. Now that `AccountKind` is documented as presentation, showing the raw enum is the one place that still contradicts it — the label belongs beside the icon it already picks |
 | No rate limiting on the server | A leaked token can be used to exhaust disk | Server hardening, unscheduled — quotas blunt it today |
 | Single currency assumed in UI totals | Dashboard uses the first account's currency | Phase 5 |
 | Category deletion leaves transactions uncategorised | Silent, no warning | Small fix, fold into 2.3 |

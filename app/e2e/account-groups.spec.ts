@@ -38,6 +38,22 @@ async function addGroup(
   await expect(page.locator(GROUPS).getByRole('heading', { name })).toBeVisible();
 }
 
+/** Create an account already filed into a group. */
+async function addFiledAccount(
+  page: import('@playwright/test').Page,
+  name: string,
+  opening: string,
+  group: string,
+): Promise<void> {
+  await goToTab(page, 'Accounts', Screen.accounts);
+  await tapAdd(page, Screen.accounts);
+  await fillField(page, 'Name', name);
+  await fillField(page, 'Opening balance', opening);
+  await chooseOption(page, 'Group', group);
+  await tap(page, 'Save');
+  await expect(page.locator(Screen.accounts).getByRole('heading', { name })).toBeVisible();
+}
+
 test.describe('account groups', () => {
   test.beforeEach(async ({ page }) => {
     await createVault(page);
@@ -114,5 +130,47 @@ test.describe('account groups', () => {
 
     await openGroups(page);
     await expect(page.locator(GROUPS).getByRole('heading', { name: 'Cards' })).toBeVisible();
+  });
+
+  test('the accounts screen groups accounts under their group', async ({ page }) => {
+    await openGroups(page);
+    await addGroup(page, 'Credit cards', 'Credit card');
+    await addGroup(page, 'Everyday', 'Default');
+
+    await addFiledAccount(page, 'Visa', '-1240.00', 'Credit cards');
+    await addFiledAccount(page, 'Current', '4100.00', 'Everyday');
+    await addAccount(page, 'Shoebox', '60.00');
+
+    const screen = page.locator(Screen.accounts);
+    await expect(screen).toContainText('Credit cards');
+    await expect(screen).toContainText('Everyday');
+    await expect(screen).toContainText('Not in a group');
+
+    // A credit-card group reads as money owed, not as a negative balance.
+    await expect(screen).toContainText('owed');
+    await expect(screen).not.toContainText('\u22121,240.00');
+
+    // Subtotals per group, and net worth still subtracts the debt.
+    await expect(screen).toContainText('$1,240.00');
+    await expect(screen).toContainText('$4,100.00');
+    await expect(screen).toContainText('$2,920.00');
+  });
+
+  test('an account moves between groups from its editor', async ({ page }) => {
+    await openGroups(page);
+    await addGroup(page, 'Credit cards', 'Credit card');
+    await addGroup(page, 'Everyday', 'Default');
+    await addFiledAccount(page, 'Visa', '-100.00', 'Credit cards');
+
+    const screen = page.locator(Screen.accounts);
+    await expect(screen).toContainText('owed');
+
+    await screen.getByRole('heading', { name: 'Visa' }).click();
+    await chooseOption(page, 'Group', 'Everyday');
+    await tap(page, 'Save');
+
+    // Now an ordinary account, so the balance reads the ordinary way again.
+    await expect(screen).not.toContainText('owed');
+    await expect(screen).toContainText('Everyday');
   });
 });

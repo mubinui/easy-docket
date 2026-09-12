@@ -11,8 +11,10 @@ import {
   trendingUpOutline,
   walletOutline,
 } from 'ionicons/icons';
+import { AccountSection, buildSections, displayBalance } from '../../core/accounts/sections';
 import { Account } from '../../core/models/domain';
 import { convert } from '../../core/money/conversion';
+import { AccountGroupsService } from '../../core/repositories/account-groups.service';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { RatesService } from '../../core/repositories/rates.service';
 import { formatMoney } from '../../core/util/money';
@@ -90,23 +92,46 @@ import {
           </div>
         }
 
-        <ion-list>
-          @for (account of accounts.active(); track account.id) {
-            <ion-item button (click)="edit(account)">
-              <ion-icon slot="start" [name]="account.icon" [style.color]="account.colour" />
-              <ion-label>
-                <h3>{{ account.name }}</h3>
-                <p>{{ account.kind }}</p>
-              </ion-label>
-              <ion-note slot="end" [color]="balanceOf(account) < 0 ? 'danger' : undefined">
-                {{ balanceOf(account) | money: account.currency }}
-                @if (converted(account); as inReporting) {
-                  <br /><small>≈ {{ inReporting }}</small>
+        @for (section of sections(); track section.group?.id ?? 'ungrouped') {
+          <ion-list>
+            <ion-item-divider>
+              <ion-label>{{ section.group?.name ?? 'Not in a group' }}</ion-label>
+              <ion-note slot="end">
+                {{ section.subtotal | money: reportingCurrency() }}
+                @if (section.owed) {
+                  <small>owed</small>
                 }
               </ion-note>
-            </ion-item>
-          }
-        </ion-list>
+            </ion-item-divider>
+
+            @if (section.unconverted.length) {
+              <div class="warning">
+                <ion-note color="warning">
+                  Subtotal excludes {{ section.unconverted.join(', ') }}
+                </ion-note>
+              </div>
+            }
+
+            @for (account of section.accounts; track account.id) {
+              <ion-item button (click)="edit(account)">
+                <ion-icon slot="start" [name]="account.icon" [style.color]="account.colour" />
+                <ion-label>
+                  <h3>{{ account.name }}</h3>
+                  <p>{{ account.kind }}</p>
+                </ion-label>
+                <ion-note slot="end" [color]="alarming(account, section) ? 'danger' : undefined">
+                  {{ shown(account, section) | money: account.currency }}
+                  @if (section.owed) {
+                    <small> owed</small>
+                  }
+                  @if (converted(account); as inReporting) {
+                    <br /><small>≈ {{ inReporting }}</small>
+                  }
+                </ion-note>
+              </ion-item>
+            }
+          </ion-list>
+        }
       } @else {
         <div class="empty">
           <ion-icon name="wallet-outline" size="large" color="medium" />
@@ -151,11 +176,29 @@ import {
 })
 export class AccountsPage {
   readonly accounts = inject(AccountsService);
+  readonly groups = inject(AccountGroupsService);
   private readonly rates = inject(RatesService);
   private readonly alerts = inject(AlertController);
 
   readonly reportingCurrency = computed(() => this.rates.reportingCurrency());
   readonly unconverted = computed(() => this.accounts.netWorthDetail().unconverted);
+
+  /**
+   * The active accounts arranged by group, with a subtotal each.
+   *
+   * The net worth figure above is deliberately left alone: a card debt already
+   * subtracts there, and flipping its sign for display must not change what the
+   * ledger adds up to.
+   */
+  readonly sections = computed<AccountSection[]>(() =>
+    buildSections({
+      accounts: this.accounts.active(),
+      groups: this.groups.active(),
+      balances: this.accounts.balances(),
+      reporting: this.reportingCurrency(),
+      rateFor: (currency) => this.rates.rateToReporting(currency),
+    }),
+  );
 
   readonly editorOpen = signal(false);
   readonly editing = signal<Account | null>(null);
@@ -166,6 +209,22 @@ export class AccountsPage {
 
   balanceOf(account: Account): number {
     return this.accounts.balances().get(account.id) ?? account.openingBalance;
+  }
+
+  /** What the row shows: money owed on a card, money held everywhere else. */
+  shown(account: Account, section: AccountSection): number {
+    return displayBalance(this.balanceOf(account), section.owed);
+  }
+
+  /**
+   * Whether the figure deserves the danger colour.
+   *
+   * An overdrawn current account is worth flagging. A balance on a credit card
+   * is not — that is what a credit card is for — so a card section is never
+   * coloured, in either direction.
+   */
+  alarming(account: Account, section: AccountSection): boolean {
+    return !section.owed && this.balanceOf(account) < 0;
   }
 
   /**
