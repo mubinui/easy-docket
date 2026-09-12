@@ -1,4 +1,13 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Account, AccountKind } from '../../core/models/domain';
 import { AccountGroupsService } from '../../core/repositories/account-groups.service';
@@ -233,6 +242,15 @@ export class AccountEditorComponent {
   constructor() {
     effect(() => {
       const account = this.existing();
+      // Only `existing()` is tracked: this effect resets the form, and the
+      // account list it reads below changes whenever a sync lands. Tracking it
+      // would wipe what the user had typed.
+      untracked(() => this.load(account));
+    });
+  }
+
+  private load(account: Account | null): void {
+    {
       if (account) {
         this.name.set(account.name);
         this.kind.set(account.kind);
@@ -263,7 +281,7 @@ export class AccountEditorComponent {
         this.archived.set(false);
       }
       this.error.set(null);
-    });
+    }
   }
 
   async save(): Promise<void> {

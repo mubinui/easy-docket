@@ -49,7 +49,10 @@ export interface SectionInput {
  * stored balance is untouched, and net worth still subtracts the debt.
  */
 export function displayBalance(balance: Minor, owed: boolean): Minor {
-  return owed ? -balance : balance;
+  if (!owed) return balance;
+  // `-0` is normalised away: negating a zero balance produces it, and a card
+  // with nothing on it would otherwise read "−$0.00 owed".
+  return balance === 0 ? 0 : -balance;
 }
 
 /**

@@ -6,6 +6,7 @@ import { lockClosedOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import { runInInjectionContext, EnvironmentInjector } from '@angular/core';
 import { activateVault } from '../../core/app-bootstrap';
 import { VaultService } from '../../core/keys/vault.service';
+import { AccountGroupsService } from '../../core/repositories/account-groups.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
 import {
   IonButton,
@@ -124,6 +125,7 @@ import {
 export class VaultPage {
   readonly vault = inject(VaultService);
   private readonly categories = inject(CategoriesService);
+  private readonly groups = inject(AccountGroupsService);
   private readonly router = inject(Router);
   private readonly injector = inject(EnvironmentInjector);
 
@@ -148,6 +150,7 @@ export class VaultPage {
       if (this.creating()) {
         await this.vault.create(this.passphrase());
         await this.categories.seedIfEmpty();
+        await this.groups.seedIfEmpty();
       } else {
         await this.vault.unlock(this.passphrase());
       }

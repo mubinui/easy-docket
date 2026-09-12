@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DOCKET_DB } from '../../core/db/db.token';
 import { DocketDb } from '../../core/db/docket-db';
+import { AccountsService } from '../../core/repositories/accounts.service';
 import { LedgerService } from '../../core/repositories/ledger.service';
 import { RatesService } from '../../core/repositories/rates.service';
 import { waitUntil } from '../../core/testing/async';
@@ -136,5 +137,49 @@ describe('TransactionEditorComponent currency handling', () => {
     const [txn] = await db.transactions.toArray();
     expect(txn.rate).toBeUndefined();
     expect(txn.rateDate).toBeUndefined();
+  });
+
+  describe('while the sheet is open', () => {
+    /**
+     * The account list is a live query. Anything that writes an account — a
+     * sync pulling one down, another tab, the starter seed finishing — makes it
+     * emit again. None of that may disturb a half-written transaction.
+     */
+    it('keeps what has been typed when the accounts change underneath', async () => {
+      const fixture = TestBed.createComponent(TransactionEditorComponent);
+      const editor = fixture.componentInstance;
+      fixture.detectChanges();
+      await waitUntil(() => editor.accountId() !== null);
+
+      editor.amount.set('45.00');
+      editor.payee.set('Corner Shop');
+      editor.note.set('half written');
+      editor.date.set('2026-03-10');
+
+      await TestBed.inject(LedgerService).put('accounts', anAccount({ id: 'acc-new', name: 'Aardvark' }));
+      await waitUntil(() => TestBed.inject(AccountsService).all().length >= 2);
+      fixture.detectChanges();
+
+      expect(editor.amount()).toBe('45.00');
+      expect(editor.payee()).toBe('Corner Shop');
+      expect(editor.note()).toBe('half written');
+      expect(editor.date()).toBe('2026-03-10');
+    });
+
+    it('keeps the account the user chose, even if a new one would sort first', async () => {
+      const fixture = TestBed.createComponent(TransactionEditorComponent);
+      const editor = fixture.componentInstance;
+      fixture.detectChanges();
+      await waitUntil(() => editor.accountId() !== null);
+
+      const chosen = editor.accountId();
+      // "Aardvark" sorts before anything already there, so a re-default would
+      // move the transaction to an account the user never picked.
+      await TestBed.inject(LedgerService).put('accounts', anAccount({ id: 'acc-new', name: 'Aardvark' }));
+      await waitUntil(() => TestBed.inject(AccountsService).all().length >= 2);
+      fixture.detectChanges();
+
+      expect(editor.accountId()).toBe(chosen);
+    });
   });
 });

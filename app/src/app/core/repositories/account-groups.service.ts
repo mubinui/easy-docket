@@ -8,6 +8,59 @@ import { sideOf } from '../accounts/classification';
 import { Account, AccountGroup, AccountGroupType } from '../models/domain';
 import { AccountsService } from './accounts.service';
 import { LedgerService } from './ledger.service';
+import { RatesService } from './rates.service';
+
+/**
+ * What a new vault starts with: one group of each kind, with a couple of
+ * accounts in the one people use every day.
+ *
+ * Opening balances are all zero. A starter account is a labelled empty shelf —
+ * inventing a balance would be putting numbers in someone's ledger that they
+ * never entered, and a financial record that starts out wrong is worse than one
+ * that starts out bare.
+ *
+ * Everything here is ordinary data: rename it, delete it, or ignore it.
+ */
+const STARTER_GROUPS: ReadonlyArray<{
+  name: string;
+  type: AccountGroupType;
+  icon: string;
+  accounts: ReadonlyArray<{ name: string; kind: Account['kind']; icon: string }>;
+}> = [
+  {
+    name: 'Everyday',
+    type: 'default',
+    icon: 'folder-outline',
+    accounts: [
+      { name: 'Cash', kind: 'cash', icon: 'cash-outline' },
+      { name: 'Current account', kind: 'bank', icon: 'business-outline' },
+    ],
+  },
+  {
+    name: 'Savings',
+    type: 'default',
+    icon: 'folder-outline',
+    accounts: [{ name: 'Savings', kind: 'savings', icon: 'save-outline' }],
+  },
+  {
+    name: 'Credit cards',
+    type: 'credit-card',
+    icon: 'card-outline',
+    accounts: [{ name: 'Credit card', kind: 'card', icon: 'card-outline' }],
+  },
+  {
+    name: 'Debit cards',
+    type: 'debit-card',
+    icon: 'card-outline',
+    accounts: [{ name: 'Debit card', kind: 'card', icon: 'card-outline' }],
+  },
+  {
+    name: 'Loans',
+    type: 'loan',
+    icon: 'trending-down-outline',
+    accounts: [{ name: 'Loan', kind: 'bank', icon: 'trending-down-outline' }],
+  },
+];
 
 /** The fields a caller must supply; the rest default. */
 export type AccountGroupDraft = Pick<AccountGroup, 'id' | 'name' | 'type'> &
@@ -36,6 +89,7 @@ export class AccountGroupsService {
   private readonly db: DocketDb = inject(DOCKET_DB);
   private readonly ledger = inject(LedgerService);
   private readonly accounts = inject(AccountsService);
+  private readonly rates = inject(RatesService);
 
   readonly all = toSignal(from(liveQuery(() => this.db.accountGroups.toArray())), {
     initialValue: [] as AccountGroup[],
@@ -123,6 +177,49 @@ export class AccountGroupsService {
       await this.ledger.put('accounts', { ...account, groupId: null });
     }
     await this.ledger.remove('accountGroups', id);
+  }
+
+  /**
+   * Seed a new vault with starter groups and accounts.
+   *
+   * Guarded on **both** tables being empty, not just groups. A device joining an
+   * existing vault syncs its accounts down before this could run, and a ledger
+   * that already has accounts but no groups belongs to someone who has been
+   * using the app since before groups existed — neither wants five invented
+   * accounts appearing alongside their real ones.
+   */
+  async seedIfEmpty(): Promise<void> {
+    const [groups, accounts] = await Promise.all([
+      this.db.accountGroups.count(),
+      this.db.accounts.count(),
+    ]);
+    if (groups > 0 || accounts > 0) return;
+
+    const currency = this.rates.reportingCurrency();
+
+    for (const [order, starter] of STARTER_GROUPS.entries()) {
+      const group = await this.save({
+        id: crypto.randomUUID(),
+        name: starter.name,
+        type: starter.type,
+        icon: starter.icon,
+        order,
+      });
+
+      for (const account of starter.accounts) {
+        await this.accounts.save({
+          id: crypto.randomUUID(),
+          name: account.name,
+          kind: account.kind,
+          icon: account.icon,
+          currency,
+          openingBalance: 0,
+          groupId: group.id,
+          archived: false,
+          colour: '#3880ff',
+        });
+      }
+    }
   }
 
   /** File an account into a group, or out of every group with `null`. */

@@ -49,14 +49,14 @@ test.describe('ledger', () => {
 
   test('a transfer moves money without changing net worth', async ({ page }) => {
     await addAccount(page, 'Everyday', '1000.00');
-    await addAccount(page, 'Savings', '500.00');
+    await addAccount(page, 'Rainy day', '500.00');
 
     await goToTab(page, 'Activity', Screen.transactions);
     await tapAdd(page, Screen.transactions);
     await chooseSegment(page, 'Transfer');
     await fillField(page, 'Amount', '200.00');
     await chooseOption(page, 'From account', 'Everyday');
-    await chooseOption(page, 'To account', 'Savings');
+    await chooseOption(page, 'To account', 'Rainy day');
     await tap(page, 'Save');
 
     await goToTab(page, 'Accounts', Screen.accounts);

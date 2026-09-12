@@ -195,7 +195,11 @@ export async function addAccount(page: Page, name: string, opening: string): Pro
   await fillField(page, 'Opening balance', opening);
   await tap(page, 'Save');
 
-  await expect(page.locator(Screen.accounts).getByRole('heading', { name })).toBeVisible();
+  // `exact`: a new vault is seeded with starter accounts, and "Current" would
+  // otherwise also match "Current account".
+  await expect(
+    page.locator(Screen.accounts).getByRole('heading', { name, exact: true }),
+  ).toBeVisible();
 }
 
 export async function addExpense(

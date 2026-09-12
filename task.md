@@ -32,8 +32,9 @@ Every task follows the same loop, and none of it is optional:
 | 7 | Account groups & credit cards | ✅ Done |
 | 8 | Accounts in totals | ✅ Done |
 | 9 | Assets and liabilities | ✅ Done |
+| 10 | Starter accounts | ✅ Done |
 
-Tests today: **785 client unit**, **82 end-to-end**, **95 Go**.
+Tests today: **798 client unit**, **84 end-to-end**, **95 Go**.
 
 ---
 
@@ -1188,6 +1189,72 @@ Generalising the sheet to loan repayments is a real follow-up, not a side effect
 
 ---
 
+## Phase 10 — Starter accounts
+
+A new vault now arrives with a group of each kind and accounts in every one:
+Everyday (Cash, Current account), Savings, Credit cards, Debit cards, Loans.
+
+`AccountGroupsService.seedIfEmpty` follows the precedent the categories seed
+set — "a new vault starts with categories so the first transaction is one tap".
+Until now you could not record anything at all without first creating an
+account, which is a worse first minute than a few labelled empty shelves.
+
+- [x] `STARTER_GROUPS`, one group per type, each with at least one account
+- [x] Seeded from the vault screen alongside the categories, on creation only
+- [x] Guarded on **both** tables being empty, so a device joining an existing
+      vault and a ledger that predates groups are both left alone
+
+**Every opening balance is zero.** A starter account is a labelled empty shelf.
+Inventing a balance would put numbers in someone's ledger that they never
+entered, and a financial record that starts out wrong is worse than one that
+starts out bare.
+
+**Tests** (13 added, 785 → 798; plus 2 end-to-end, 82 → 84)
+- [x] Unit: a group of every type, every group holding an account, nothing
+      ungrouped, zero balances, the reporting currency, all counted in totals,
+      idempotent on a second run, skipped when accounts already exist, skipped
+      when groups already exist, replicating as ordinary operations
+- [x] e2e: a fresh vault showing both halves of the balance sheet with every
+      starter group and account, no invented money, and the starters behaving
+      like ordinary data when renamed
+
+### What seeding found
+
+Changing the starting state broke 23 end-to-end tests. Most were name
+collisions and were mechanical. Three were not.
+
+**Every cleared liability read "−$0.00 owed".** `displayBalance` negated a zero
+balance into `-0`. The same bug had already been fixed in `statement.ts` and
+not in `sections.ts` — the sort of thing that only shows up when a screen has a
+liability account with nothing on it, which no test had until the seed created
+five of them.
+
+**The floating add button swallowed taps on the last row.** With a long enough
+list, a row scrolls as far as it can and stops underneath the button, which then
+intercepts every tap aimed at it — including "Pay" on a card, the one control
+that screen exists for. Scrolling cannot help: the button is fixed. The content
+now leaves 88px for it to sit over.
+
+**An editor reset itself whenever the accounts changed.** The transaction
+editor's effect read `accounts.active()` to default the account, so the effect
+re-ran on *any* write to the accounts table — and that effect resets the whole
+form. A sync landing, another tab, or the seed finishing would silently wipe a
+half-written transaction: amount, payee, date, note, all of it, with nothing on
+screen to say why.
+
+Only `existing()` is tracked now; the rest runs `untracked`, and a second,
+narrower effect fills in the default account once the list arrives — but only
+while the field is still empty, so a user's choice is never overwritten. The
+account editor had the same shape and got the same treatment. Two tests pin it:
+typing survives an account arriving, and a new account that would sort first
+does not steal the transaction.
+
+This is the third time a signal-reading effect has quietly undone user input
+(the pay-bill funding account was the first). **An `effect` that resets a form
+must track only the thing that means "start again".**
+
+---
+
 ---
 
 ## The flaky delete
@@ -1279,6 +1346,10 @@ Things learned the hard way, worth not relearning:
 - **A stub agrees with whatever you wrote.** The Git adapter was unit-tested,
   typed and linted, and had never once worked. Anything that speaks a protocol
   needs to speak it to something that did not come from this repository.
+- **An `effect` that resets a form must track only the thing that means "start
+  again".** Three separate editors reset themselves whenever an unrelated signal
+  they happened to read changed — silently discarding whatever had been typed.
+  Read the trigger, then do the rest inside `untracked`.
 - **A money figure appears more than once on a screen.** `toContainText('$1,000.00')`
   on a whole page matched an account's own row balance, not the headline it was
   meant to check — so the assertion passed before the switch had written

@@ -71,6 +71,17 @@ import {
       .warning {
         padding: 0 1rem 0.75rem;
       }
+      /*
+       * Room for the floating add button to sit over.
+       *
+       * Without it the last row scrolls as far as it can and stops underneath
+       * the button, which then swallows every tap aimed at that row — including
+       * the "Pay" button on a card, which is the one control a person opens this
+       * screen to press. Scrolling cannot help: the button is fixed.
+       */
+      ion-content {
+        --padding-bottom: 88px;
+      }
       .sheet {
         display: flex;
         gap: 1.5rem;

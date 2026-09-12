@@ -268,6 +268,34 @@ export class TransactionEditorComponent {
     // the account to the first available saves a tap on the common path.
     effect(() => {
       const txn = this.existing();
+    // Only `existing()` is tracked. Everything below reads other signals —
+    // the account list, the rate table — and this effect *resets the form*, so
+    // tracking them would mean a sync landing, or another tab writing, silently
+    // wiping whatever the user had typed. That is a data-loss bug of the
+    // quietest kind: the sheet simply looks as though nothing was entered.
+      untracked(() => this.load(txn));
+    });
+
+    /**
+     * Fill in the default account once the account list has arrived.
+     *
+     * The reset above runs before Dexie's first emission, when there is nothing
+     * to default to. This fills the gap — but only while the field is still
+     * empty, so a later change to the accounts (a sync landing, another tab)
+     * can never overwrite an account the user has chosen.
+     */
+    effect(() => {
+      const first = this.accounts.active()[0];
+      untracked(() => {
+        if (this.existing() || this.accountId() !== null || !first) return;
+        this.accountId.set(first.id);
+        this.suggestRate();
+      });
+    });
+  }
+
+  private load(txn: Transaction | null): void {
+    {
       if (txn) {
         this.kind.set(txn.kind);
         this.amount.set(formatAmount(txn.amount, txn.currency));
@@ -297,7 +325,7 @@ export class TransactionEditorComponent {
       // another currency, in which case the field would otherwise sit empty
       // with a rate already known.
       this.suggestRate();
-    });
+    }
   }
 
   readonly reportingCurrency = computed(() => this.rates.reportingCurrency());

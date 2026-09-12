@@ -33,6 +33,12 @@ describe('displayBalance', () => {
     expect(displayBalance(-1_240_00, true)).toBe(1_240_00);
   });
 
+  it('shows nothing owed as zero, not as minus zero', () => {
+    // A cleared card would otherwise read "−$0.00 owed".
+    expect(Object.is(displayBalance(0, true), -0)).toBe(false);
+    expect(displayBalance(0, true)).toBe(0);
+  });
+
   it('shows a card in credit as a negative amount owed', () => {
     // Overpaying a card is unusual but real, and "−50 owed" is the honest way
     // to say the card owes you.
