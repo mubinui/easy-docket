@@ -8,6 +8,7 @@ import {
   goToTab,
   tap,
   tapAdd,
+  waitForEditorClosed,
   waitForScreen,
 } from './helpers';
 
@@ -220,8 +221,9 @@ test.describe('account groups', () => {
     await fillField(page, 'Opening balance', '-100.00');
     await fillField(page, 'Credit limit', '1000.00');
     await tap(page, 'Save');
-    // Wait for the write to be on screen before reloading: a reload that lands
-    // mid-write loses it, which is its own open question in the gaps table.
+    // The editor closes only once its write has resolved, so this is what makes
+    // the reload below safe: reloading mid-write can cut the write off.
+    await waitForEditorClosed(page);
     await expect(page.locator(Screen.accounts).getByRole('heading', { name: 'Visa' })).toBeVisible();
 
     await page.reload();

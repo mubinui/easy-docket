@@ -137,6 +137,25 @@ export async function goToTab(page: Page, name: string, screen: string): Promise
   await waitForScreen(page, screen);
 }
 
+/**
+ * Wait for an open editor modal to finish closing.
+ *
+ * Needed before asserting that something is *gone*, and before any reload.
+ *
+ * An editor closes only once its write has resolved, so a closed modal is the
+ * signal that the change actually reached IndexedDB. Reloading before that can
+ * cut the write off — a delete that looked done comes back.
+ *
+ * And while a modal is open, Ionic takes the page behind it out of the
+ * accessibility tree, so `getByRole` scoped to that page matches nothing at
+ * all. An assertion that a row has disappeared will pass the instant the modal
+ * opens, for entirely the wrong reason, while the row is still in the DOM and
+ * still in the database.
+ */
+export async function waitForEditorClosed(page: Page): Promise<void> {
+  await expect(page.locator('ion-modal.show-modal')).toHaveCount(0);
+}
+
 export async function tapAdd(page: Page, screen: string): Promise<void> {
   await page.locator(`${screen} ion-fab-button`).click();
   await expect(page.locator('ion-modal.show-modal')).toBeVisible();

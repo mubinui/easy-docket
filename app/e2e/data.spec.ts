@@ -1,5 +1,13 @@
 import { expect, test } from './fixtures';
-import { Screen, addAccount, addExpense, createVault, goToTab, tap } from './helpers';
+import {
+  Screen,
+  addAccount,
+  addExpense,
+  createVault,
+  goToTab,
+  tap,
+  waitForEditorClosed,
+} from './helpers';
 
 const DATA = 'app-data';
 
@@ -116,6 +124,7 @@ test.describe('import and backup', () => {
     await goToTab(page, 'Activity', Screen.transactions);
     await page.locator(Screen.transactions).getByRole('heading', { name: 'Corner Shop' }).click();
     await tap(page, 'Delete transaction');
+    await waitForEditorClosed(page);
     await expect(
       page.locator(Screen.transactions).getByRole('heading', { name: 'Corner Shop' }),
     ).toHaveCount(0);

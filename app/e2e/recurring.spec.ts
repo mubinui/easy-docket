@@ -9,6 +9,7 @@ import {
   tap,
   tapAdd,
   unlockToLedger,
+  waitForEditorClosed,
 } from './helpers';
 
 const RULES = 'app-rules';
@@ -119,6 +120,7 @@ test.describe('recurring', () => {
     // Delete the materialised transaction.
     await page.locator(Screen.transactions).getByRole('heading', { name: 'Rent' }).first().click();
     await tap(page, 'Delete transaction');
+    await waitForEditorClosed(page);
     await expect(
       page.locator(Screen.transactions).getByRole('heading', { name: 'Rent' }),
     ).toHaveCount(0);

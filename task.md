@@ -1002,7 +1002,7 @@ Real, currently unaddressed, and each one has a home above.
 | ~~Git adapter has no integration test~~ | — | ✅ Closed: `git http-backend` in the e2e suite. **It found two bugs that made Git sync entirely non-functional** — see below |
 | ~~S3 adapter has no integration test~~ | — | ✅ Closed: MinIO in Docker. Passed first time |
 | `remove` is unproven against S3 and Git | Pruning is covered against the Go server and by unit tests, but the S3 and Git delete paths have not run against a real remote | Open. Needs a snapshot to trigger, which needs 200 operations — worth a seeded fixture rather than driving the UI |
-| A deleted transaction can come back if the app reloads immediately after | Real, and about data the user asked to be gone | Open, its own task. `recurring.spec.ts` "a deleted occurrence stays deleted" fails roughly 3 runs in 8, **before and after Phase 7 alike**. On a failing run the operation log holds only the `put` — no tombstone — and the row is still in the table, so the delete was lost rather than undone. The delete path is properly awaited (`remove()` → `TransactionsService.remove` → `LedgerService.remove`), which points at the write being cut off by the reload rather than at missing sequencing. Not guessed at: a wrong fix here silently resurrects financial records |
+| ~~A deleted transaction can come back if the app reloads immediately after~~ | — | ✅ Closed. **It was the test, not the app** — see "The flaky delete" below |
 | The accounts list shows `kind` as its stored value | Cosmetic: a row reads "bank" rather than "Bank account" | Open, small. Now that `AccountKind` is documented as presentation, showing the raw enum is the one place that still contradicts it — the label belongs beside the icon it already picks |
 | No rate limiting on the server | A leaked token can be used to exhaust disk | Server hardening, unscheduled — quotas blunt it today |
 | Single currency assumed in UI totals | Dashboard uses the first account's currency | Phase 5 |
@@ -1011,6 +1011,50 @@ Real, currently unaddressed, and each one has a home above.
 | `BudgetsService.statuses` and `ReportsService` read the whole transaction table | Fine for a personal ledger, wrong for a large one | Still open. Net worth genuinely needs the whole history, so a windowed query only helps the other aggregations; worth doing when a ledger large enough to notice exists |
 | Reports have no per-category drill-down | Tapping a bar does nothing | Unscheduled; the Activity screen already filters by category |
 | Android build needs JDK 21 | JDK 25 is rejected by this Gradle | Documented in `docs/DEPLOYMENT.md`; revisit on Gradle upgrade |
+
+---
+
+## The flaky delete
+
+`recurring.spec.ts` "a deleted occurrence stays deleted" failed about three runs
+in eight for as long as it had existed. It looked like the worst kind of bug: on
+a failing run the operation log held only the `put`, with no tombstone, and the
+row was still in the table — a delete the user had asked for, lost.
+
+It was not a bug in the app. It was two faults in the test, stacked so that each
+hid the other.
+
+**The assertion passed for the wrong reason.** The test tapped "Delete
+transaction" and immediately asserted that no "Rent" heading remained, scoped by
+role to `app-transactions`. While a modal is open, Ionic takes the page behind
+it out of the accessibility tree, so `getByRole` there matches *nothing*. The
+assertion was satisfied the moment the editor opened. Measured directly at that
+point: the DOM still held the row (`h3` count 1) while the role query returned 0.
+
+**So the reload raced the write.** With the assertion passing instantly, the
+test reloaded while `LedgerService.remove` was still inside its IndexedDB
+transaction. Probes placed in the ledger showed the order plainly — the test's
+"about to reload" line printed *before* the row was deleted, every single run —
+and when the reload won, the whole transaction went with it: no row removed, no
+tombstone written, which is exactly the consistent, atomic outcome the operation
+log is designed to give. Nothing was half-written. The write simply never
+happened.
+
+**The fix is one wait, and it is the honest one.** The editor closes only after
+its write resolves, so waiting for the modal to close both makes the absence
+assertion meaningful and guarantees the change reached the database.
+`waitForEditorClosed` in `e2e/helpers.ts` carries that explanation, and the same
+pattern was fixed in `data.spec.ts`, which deleted a transaction the same way.
+Twelve consecutive runs of the previously flaky test now pass.
+
+**Every probe was thrown away.** The diagnosis needed instrumentation inside
+`LedgerService`, and that instrumentation changed what it measured — adding any
+await before the reload made the test pass. Two earlier conclusions drawn from
+single samples were wrong: that Phase 7.1 had introduced the failure (it had
+not — the same test fails the same way three commits earlier), and that the
+transaction was hanging (a probe whose anchor never matched, so the logs it
+"proved" absent were never compiled in). Both were caught by going back and
+measuring rather than by reasoning further.
 
 ---
 
@@ -1059,6 +1103,12 @@ Things learned the hard way, worth not relearning:
 - **A stub agrees with whatever you wrote.** The Git adapter was unit-tested,
   typed and linted, and had never once worked. Anything that speaks a protocol
   needs to speak it to something that did not come from this repository.
+- **An open modal hides the page behind it from `getByRole`.** Ionic takes the
+  page underneath out of the accessibility tree, so a role-scoped assertion that
+  a row is *gone* passes the instant the modal opens — while the row is still in
+  the DOM and still in the database. Before asserting an absence, or reloading,
+  wait for the editor to close (`waitForEditorClosed`): that is also the signal
+  the write has resolved.
 - **A passing test is not a visible screen.** Every editor in the app rendered
   into a collapsed `ion-content` — the transaction editor showed its segment and
   no fields at all — through 59 green end-to-end tests, because `fill()` and
