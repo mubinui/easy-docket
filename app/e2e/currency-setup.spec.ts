@@ -43,8 +43,15 @@ test.describe('an account currency', () => {
     await page.locator(Screen.accounts).getByRole('heading', { name: 'Cash', exact: true }).click();
 
     const modal = page.locator('ion-modal.show-modal').last();
-    await expect(modal).toContainText('can still be changed');
-    await expect(modal.locator('ion-select').filter({ hasText: /USD/ }).first()).toBeEnabled();
+    const field = modal.locator('app-currency-field').getByRole('button').first();
+    await expect(field).toBeEnabled();
+    await expect(field).toContainText('USD');
+
+    // The reason it is still open lives in the picker, next to the choice.
+    await field.click();
+    await expect(page.locator('app-currency-picker')).toContainText(
+      'Changeable while the account has no transactions',
+    );
   });
 
   test('is fixed once something is recorded against it', async ({ page }) => {
@@ -59,7 +66,9 @@ test.describe('an account currency', () => {
     await page.locator(Screen.accounts).getByRole('heading', { name: 'Cash', exact: true }).click();
 
     const modal = page.locator('ion-modal.show-modal').last();
-    // Changing it would reinterpret every amount already recorded.
-    await expect(modal).toContainText('fixed once an account has transactions');
+    // Changing it would reinterpret every amount already recorded. The picker
+    // cannot be opened to say so, so the form says it instead.
+    await expect(modal).toContainText('Fixed once an account has transactions');
+    await expect(modal.locator('app-currency-field').getByRole('button').first()).toBeDisabled();
   });
 });

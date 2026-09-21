@@ -73,7 +73,7 @@ import {
             <ion-item lines="none">
               <ion-note>
                 Your key stays in the device keystore either way. This asks the device to check
-                you are the one holding it before the ledger opens — without it, a phone found
+                you are the one holding it before the ledger opens. Without it, a phone found
                 unlocked is a ledger left open. Your passphrase still works if the check fails.
               </ion-note>
             </ion-item>

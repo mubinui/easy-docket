@@ -76,7 +76,7 @@ import { GROUP_TYPES, GroupEditorComponent } from './group-editor.component';
           <p>
             <ion-note>
               No groups yet. A group files accounts together, and its type decides how they
-              behave — a credit card group turns balances into what you owe.
+              behave. A credit card group turns balances into what you owe.
             </ion-note>
           </p>
         </div>

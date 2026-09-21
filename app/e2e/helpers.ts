@@ -168,6 +168,34 @@ export async function tapAdd(page: Page, screen: string): Promise<void> {
   await expect(page.locator('ion-modal.show-modal').last()).toBeVisible();
 }
 
+/**
+ * Choose a currency, driving the grid the picker opens.
+ *
+ * Its own helper rather than `chooseOption`: the currency control is not an
+ * `ion-select` but a button over a modal grid, and one tap on a tile commits
+ * the choice, so there is no OK to press afterwards.
+ */
+export async function chooseCurrency(
+  page: Page,
+  code: string,
+  screen?: string,
+  label = 'Currency',
+): Promise<void> {
+  const field = (await surface(page, screen))
+    .locator('app-currency-field')
+    .filter({ has: page.getByRole('button', { name: new RegExp(`^${escapeForRegExp(label)}:`) }) })
+    .first();
+
+  await field.waitFor({ state: 'visible' });
+  await field.getByRole('button').first().click();
+
+  const picker = page.locator('app-currency-picker');
+  await picker.waitFor({ state: 'visible' });
+  // A row reads "Bangladeshi Taka BDT": the name leads, the code closes it.
+  await picker.getByRole('radio', { name: new RegExp(`\\b${escapeForRegExp(code)}$`) }).click();
+  await picker.waitFor({ state: 'detached' });
+}
+
 /** Create a vault and land on the summary screen. */
 export async function createVault(
   page: Page,
@@ -179,7 +207,7 @@ export async function createVault(
 
   await fillField(page, 'Passphrase', passphrase, Screen.vault);
   await fillField(page, 'Confirm passphrase', passphrase, Screen.vault);
-  if (currency) await chooseOption(page, 'Currency', currency, Screen.vault);
+  if (currency) await chooseCurrency(page, currency, Screen.vault);
   await tap(page, 'Create vault', Screen.vault);
 
   await expect(page).toHaveURL(/\/tabs\/dashboard/);

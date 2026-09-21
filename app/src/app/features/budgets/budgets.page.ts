@@ -111,7 +111,7 @@ import { BudgetEditorComponent } from './budget-editor.component';
                     <div class="warning">
                       <ion-icon name="alert-circle-outline" color="warning" />
                       <ion-text color="warning">
-                        {{ progress.unconverted }} transaction(s) not counted — no rate to
+                        {{ progress.unconverted }} transaction(s) not counted: no rate to
                         {{ status.budget.currency }}
                       </ion-text>
                     </div>
@@ -132,7 +132,7 @@ import { BudgetEditorComponent } from './budget-editor.component';
                     <ion-icon name="alert-circle-outline" color="warning" />
                     <ion-text color="warning">
                       {{ status.staleCategoryIds.length }} deleted
-                      {{ status.staleCategoryIds.length === 1 ? 'category' : 'categories' }} —
+                      {{ status.staleCategoryIds.length === 1 ? 'category' : 'categories' }}:
                       this budget is missing spending
                     </ion-text>
                     <ion-button size="small" fill="clear" (click)="fix(status, $event)">
@@ -168,7 +168,7 @@ import { BudgetEditorComponent } from './budget-editor.component';
       }
 
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button [disabled]="!categories.expense().length" (click)="create()">
+        <ion-fab-button aria-label="Add budget" [disabled]="!categories.expense().length" (click)="create()">
           <ion-icon name="add-outline" />
         </ion-fab-button>
       </ion-fab>

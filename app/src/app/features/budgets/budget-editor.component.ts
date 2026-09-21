@@ -63,7 +63,7 @@ const PERIODS: ReadonlyArray<{ value: BudgetPeriod; label: string }> = [
         </ion-buttons>
         <ion-title>{{ existing() ? 'Edit' : 'New' }} budget</ion-title>
         <ion-buttons slot="end">
-          <ion-button strong="true" [disabled]="!canSave()" (click)="save()">Save</ion-button>
+          <ion-button strong="true" fill="solid" [disabled]="!canSave()" (click)="save()">Save</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -141,7 +141,7 @@ const PERIODS: ReadonlyArray<{ value: BudgetPeriod; label: string }> = [
         <ion-note>
           {{ anchorHint() }}
           @if (rollover()) {
-            Anything left over is added to the next period — and anything overspent is taken off it.
+            Anything left over is added to the next period, and anything overspent is taken off it.
           }
         </ion-note>
       </ion-item>

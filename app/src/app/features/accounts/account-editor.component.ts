@@ -9,12 +9,12 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { COMMON_CURRENCIES } from '../../core/money/currencies';
 import { Account, AccountKind } from '../../core/models/domain';
 import { AccountGroupsService } from '../../core/repositories/account-groups.service';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { RatesService } from '../../core/repositories/rates.service';
 import { formatAmount, parseAmount } from '../../core/util/money';
+import { CurrencyFieldComponent } from '../../shared/currency-field.component';
 import {
   IonButton,
   IonButtons,
@@ -46,7 +46,7 @@ const KINDS: ReadonlyArray<{ value: AccountKind; label: string; icon: string }> 
 @Component({
   selector: 'app-account-editor',
   standalone: true,
-  imports: [FormsModule, IonButton, IonButtons, IonContent, IonHeader, IonInput, IonItem, IonList, IonNote, IonSelect, IonSelectOption, IonText, IonTitle, IonToggle, IonToolbar],
+  imports: [CurrencyFieldComponent, FormsModule, IonButton, IonButtons, IonContent, IonHeader, IonInput, IonItem, IonList, IonNote, IonSelect, IonSelectOption, IonText, IonTitle, IonToggle, IonToolbar],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -55,7 +55,7 @@ const KINDS: ReadonlyArray<{ value: AccountKind; label: string; icon: string }> 
         </ion-buttons>
         <ion-title>{{ existing() ? 'Edit' : 'New' }} account</ion-title>
         <ion-buttons slot="end">
-          <ion-button strong="true" [disabled]="!name().trim()" (click)="save()">Save</ion-button>
+          <ion-button strong="true" fill="solid" [disabled]="!name().trim()" (click)="save()">Save</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -104,19 +104,24 @@ const KINDS: ReadonlyArray<{ value: AccountKind; label: string; icon: string }> 
           </ion-select>
         </ion-item>
 
-        <ion-item>
-          <ion-select
-            label="Currency"
-            labelPlacement="stacked"
+        <ion-item [lines]="currencyLocked() ? 'none' : undefined">
+          <app-currency-field
+            [value]="currency()"
             [disabled]="currencyLocked()"
-            [ngModel]="currency()"
-            (ngModelChange)="setCurrency($event)"
-          >
-            @for (code of currencies; track code) {
-              <ion-select-option [value]="code">{{ code }}</ion-select-option>
-            }
-          </ion-select>
+            [footnote]="currencyFootnote()"
+            (valueChange)="setCurrency($event)"
+          />
         </ion-item>
+        <!--
+          The one case that still needs copy on the form. Everywhere else the
+          picker carries it, but a locked field cannot be opened, so an
+          unexplained dead control is all the user would see.
+        -->
+        @if (currencyLocked()) {
+          <ion-item>
+            <ion-note>Fixed once an account has transactions.</ion-note>
+          </ion-item>
+        }
 
         <ion-item>
           <ion-input
@@ -190,18 +195,13 @@ const KINDS: ReadonlyArray<{ value: AccountKind; label: string; icon: string }> 
         </ion-item>
       }
 
-      <ion-item lines="none">
-        <ion-note>
-          @if (currencyLocked()) {
-            The currency is fixed once an account has transactions, because changing it would
-            silently reinterpret every amount already recorded against it.
-          } @else if (existing()) {
-            The currency can still be changed while the account has no transactions.
-          } @else {
+      @if (!existing()) {
+        <ion-item lines="none">
+          <ion-note>
             The opening balance is what the account held before your first recorded transaction.
-          }
-        </ion-note>
-      </ion-item>
+          </ion-note>
+        </ion-item>
+      }
 
       @if (error()) {
         <ion-item lines="none">
@@ -221,7 +221,6 @@ export class AccountEditorComponent {
   readonly cancelled = output<void>();
 
   readonly kinds = KINDS;
-  readonly currencies = COMMON_CURRENCIES;
 
   readonly name = signal('');
   readonly kind = signal<AccountKind>('bank');
@@ -267,6 +266,13 @@ export class AccountEditorComponent {
    * offering a change that turns out to be unsafe is not.
    */
   readonly currencyLocked = computed(() => this.existing() !== null && this.recorded() !== 0);
+
+  /** Shown under the picker's grid, where the choice is actually being made. */
+  readonly currencyFootnote = computed(() =>
+    this.existing()
+      ? 'Changeable while the account has no transactions.'
+      : 'What this account is held in. Totals convert into the vault currency.',
+  );
 
   constructor() {
     effect(() => {

@@ -221,7 +221,7 @@ import {
               <ion-note>
                 A browser cannot reach most Git hosts directly, so the web app needs a proxy. The
                 Android app does not. The proxy only ever relays encrypted data, but it does see
-                your repository URL and token — run your own if that matters to you.
+                your repository URL and token. Run your own if that matters to you.
               </ion-note>
             </ion-item>
           </ion-list>

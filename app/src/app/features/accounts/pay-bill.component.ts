@@ -41,7 +41,7 @@ export type PayChoice = 'statement' | 'full' | 'custom';
         </ion-buttons>
         <ion-title>Pay {{ card()?.name }}</ion-title>
         <ion-buttons slot="end">
-          <ion-button strong="true" [disabled]="!canPay()" (click)="pay()">Pay</ion-button>
+          <ion-button strong="true" fill="solid" [disabled]="!canPay()" (click)="pay()">Pay</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -57,7 +57,7 @@ export type PayChoice = 'statement' | 'full' | 'custom';
               <ion-radio value="statement">
                 <ion-label>
                   <h3>Statement balance</h3>
-                  <p>{{ money(bill.remaining) }} — due {{ when(bill.dueOn) }}</p>
+                  <p>{{ money(bill.remaining) }} · due {{ when(bill.dueOn) }}</p>
                 </ion-label>
               </ion-radio>
             </ion-item>
@@ -67,7 +67,7 @@ export type PayChoice = 'statement' | 'full' | 'custom';
             <ion-radio value="full">
               <ion-label>
                 <h3>Full balance</h3>
-                <p>{{ money(currentOwed()) }} — everything on the card today</p>
+                <p>{{ money(currentOwed()) }} · everything on the card today</p>
               </ion-label>
             </ion-radio>
           </ion-item>
@@ -120,7 +120,7 @@ export type PayChoice = 'statement' | 'full' | 'custom';
         <ion-note>
           @if (!fundingAccounts().length) {
             There is no account in {{ card()?.currency }} to pay this card from. A payment is a
-            transfer, and a transfer moves one amount between two accounts — so both have to be
+            transfer, and a transfer moves one amount between two accounts, so both have to be
             in the same currency.
           } @else {
             Recorded as a transfer from the account you choose onto the card. Nothing is sent to

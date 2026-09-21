@@ -65,7 +65,7 @@ import { RatesService } from '../../core/repositories/rates.service';
       <div class="explain">
         <ion-note>
           Switch an account off to leave it out of net worth and the balance sheet. It keeps its
-          transactions and its own balance either way — this only changes what is added up.
+          transactions and its own balance either way. This only changes what is added up.
         </ion-note>
       </div>
 

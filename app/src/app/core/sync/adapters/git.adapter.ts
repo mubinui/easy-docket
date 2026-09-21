@@ -285,8 +285,8 @@ export class GitAdapter implements SyncAdapter {
     return (
       `A browser cannot reach ${host} directly: Git hosts send no CORS headers, ` +
       'so the request is blocked before it is even authenticated. Set a CORS proxy ' +
-      'in the sync settings — https://cors.isomorphic-git.org, or one you run ' +
-      'yourself — or sync from the Android app, which does not need one.'
+      'in the sync settings (https://cors.isomorphic-git.org, or one you run ' +
+      'yourself), or sync from the Android app, which does not need one.'
     );
   }
 }

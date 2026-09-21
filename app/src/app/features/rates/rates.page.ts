@@ -17,18 +17,16 @@ import {
   IonListHeader,
   IonModal,
   IonNote,
-  IonSelect,
-  IonSelectOption,
   IonText,
   IonTitle,
   IonToolbar,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { addOutline, swapHorizontalOutline } from 'ionicons/icons';
-import { COMMON_CURRENCIES } from '../../core/money/currencies';
 import { AccountsService } from '../../core/repositories/accounts.service';
 import { PairSummary, RatesService } from '../../core/repositories/rates.service';
 import { toIsoDate } from '../../core/util/dates';
+import { CurrencyFieldComponent } from '../../shared/currency-field.component';
 
 /**
  * Exchange rates, entered by hand.
@@ -42,6 +40,7 @@ import { toIsoDate } from '../../core/util/dates';
   selector: 'app-rates',
   standalone: true,
   imports: [
+    CurrencyFieldComponent,
     FormsModule,
     IonHeader,
     IonToolbar,
@@ -57,8 +56,6 @@ import { toIsoDate } from '../../core/util/dates';
     IonNote,
     IonIcon,
     IonInput,
-    IonSelect,
-    IonSelectOption,
     IonText,
     IonFab,
     IonFabButton,
@@ -91,23 +88,14 @@ import { toIsoDate } from '../../core/util/dates';
     <ion-content>
       <ion-list>
         <ion-list-header><ion-label>Reporting currency</ion-label></ion-list-header>
-        <ion-item>
-          <ion-select
-            label="Totals shown in"
-            labelPlacement="stacked"
-            [ngModel]="rates.reportingCurrency()"
-            (ngModelChange)="changeReporting($event)"
-          >
-            @for (code of currencyOptions(); track code) {
-              <ion-select-option [value]="code">{{ code }}</ion-select-option>
-            }
-          </ion-select>
-        </ion-item>
         <ion-item lines="none">
-          <ion-note>
-            Rates are recorded against this currency at the moment each transaction happens, so
-            changing it later leaves older figures quoted against the currency you used before.
-          </ion-note>
+          <app-currency-field
+            label="Totals shown in"
+            footnote="Rates are recorded against this currency as each transaction happens, so changing it leaves older figures quoted against the one you used before."
+            [value]="rates.reportingCurrency()"
+            [extra]="currencyOptions()"
+            (valueChange)="changeReporting($event)"
+          />
         </ion-item>
       </ion-list>
 
@@ -148,7 +136,7 @@ import { toIsoDate } from '../../core/util/dates';
               <ion-buttons slot="start"><ion-button (click)="close()">Cancel</ion-button></ion-buttons>
               <ion-title>Add rate</ion-title>
               <ion-buttons slot="end">
-                <ion-button strong="true" [disabled]="!canSave()" (click)="save()">Save</ion-button>
+                <ion-button strong="true" fill="solid" [disabled]="!canSave()" (click)="save()">Save</ion-button>
               </ion-buttons>
             </ion-toolbar>
           </ion-header>
@@ -222,10 +210,14 @@ export class RatesPage {
   readonly error = signal<string | null>(null);
 
   /** Currencies in play, plus the common ones, so the picker is never empty. */
+  /**
+   * The currencies this vault actually deals in, listed ahead of the offered
+   * set. The picker adds the common ones itself, so these are only the codes
+   * it would otherwise not know about.
+   */
   readonly currencyOptions = computed(() => {
     const used = this.accounts.all().map((account) => account.currency);
-    const common = COMMON_CURRENCIES;
-    return [...new Set([...used, this.rates.reportingCurrency(), ...common])].sort();
+    return [...new Set([...used, this.rates.reportingCurrency()])].sort();
   });
 
   readonly canSave = computed(

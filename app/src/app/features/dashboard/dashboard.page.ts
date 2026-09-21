@@ -6,6 +6,9 @@ import {
   arrowUpOutline,
   chevronForwardOutline,
   cloudOfflineOutline,
+  pieChartOutline,
+  listOutline,
+  shieldCheckmarkOutline,
 } from 'ionicons/icons';
 import { balanceSheet, buildSections } from '../../core/accounts/sections';
 import { AccountGroupsService } from '../../core/repositories/account-groups.service';
@@ -48,53 +51,7 @@ import {
   selector: 'app-dashboard',
   standalone: true,
   imports: [RouterLink, MoneyPipe, BudgetBarComponent, SyncStatusComponent, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonNote, IonRefresher, IonRefresherContent, IonTitle, IonToolbar],
-  styles: [
-    `
-      .net-worth {
-        font-size: 2rem;
-        font-weight: 600;
-        margin: 0;
-      }
-      .flows {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-      }
-      .flow {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-      .flow strong {
-        display: block;
-        font-size: 1.1rem;
-      }
-      .bar {
-        height: 6px;
-        border-radius: 3px;
-        background: var(--ion-color-step-150, #e0e0e0);
-        overflow: hidden;
-      }
-      .bar span {
-        display: block;
-        height: 100%;
-      }
-      .empty {
-        text-align: center;
-        padding: 2rem 1rem;
-      }
-      .budget-name {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 0.5rem;
-      }
-      .budget-name ion-note {
-        font-size: 0.7rem;
-        letter-spacing: 0.04em;
-      }
-    `,
-  ],
+  styleUrls: ['./dashboard.page.scss'],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -108,13 +65,18 @@ import {
         <ion-refresher-content />
       </ion-refresher>
 
-      <ion-card>
+      <div class="dashboard-layout">
+      <section class="page-intro">
+        <div><h1>Your money, at a glance.</h1><p>A little clarity for your everyday.</p></div>
+        <span class="month-label">{{ currentMonth }}</span>
+      </section>
+      <ion-card class="balance-card">
         <ion-card-header>
           <ion-card-title>Net worth</ion-card-title>
         </ion-card-header>
         <ion-card-content>
           <p class="net-worth">{{ accounts.netWorth() | money: currency() }}</p>
-          <ion-note>across {{ accounts.counted().length }} account(s)</ion-note>
+          <ion-note>Across {{ accounts.counted().length }} {{ accounts.counted().length === 1 ? 'account' : 'accounts' }}</ion-note>
 
           @if (sheet().liabilities !== 0) {
             <!-- Only worth the space once something is owed. -->
@@ -130,7 +92,7 @@ import {
             <!-- Never a silently short total: say which currencies are missing. -->
             <p>
               <ion-note color="warning">
-                Excludes {{ unconvertedAccounts().join(', ') }} — no rate recorded
+                Excludes {{ unconvertedAccounts().join(', ') }}: no rate recorded
               </ion-note>
             </p>
           }
@@ -164,7 +126,7 @@ import {
         </ion-card>
       }
 
-      <ion-card>
+      <ion-card class="cashflow-card">
         <ion-card-header>
           <ion-card-title>This month</ion-card-title>
         </ion-card-header>
@@ -174,14 +136,14 @@ import {
               <ion-icon name="arrow-down-outline" color="success" />
               <div>
                 <strong>{{ transactions.totals().income | money: currency() }}</strong>
-                <ion-note>in</ion-note>
+                <ion-note>Income</ion-note>
               </div>
             </div>
             <div class="flow">
               <ion-icon name="arrow-up-outline" color="danger" />
               <div>
                 <strong>{{ transactions.totals().expense | money: currency() }}</strong>
-                <ion-note>out</ion-note>
+                <ion-note>Expenses</ion-note>
               </div>
             </div>
           </div>
@@ -189,14 +151,14 @@ import {
           @if (transactions.totals().unconverted; as missing) {
             <p>
               <ion-note color="warning">
-                {{ missing }} transaction(s) excluded — no exchange rate
+                {{ missing }} transaction(s) excluded: no exchange rate
               </ion-note>
             </p>
           }
         </ion-card-content>
       </ion-card>
 
-      <ion-card>
+      <ion-card class="spending-card">
         <ion-card-header>
           <ion-card-title>Where it went</ion-card-title>
         </ion-card-header>
@@ -217,7 +179,10 @@ import {
             </ion-list>
           } @else {
             <div class="empty">
-              <ion-note>No spending recorded this month yet.</ion-note>
+              <ion-icon name="pie-chart-outline" aria-hidden="true" />
+              <h3>Make sense of your spending.</h3>
+              <p>No spending recorded this month yet.</p>
+              <a routerLink="/tabs/transactions">Add your first expense <ion-icon name="chevron-forward-outline" /></a>
             </div>
           }
 
@@ -229,7 +194,7 @@ import {
         </ion-card-content>
       </ion-card>
 
-      <ion-card>
+      <ion-card class="budgets-card">
         <ion-card-header>
           <ion-card-title>Budgets</ion-card-title>
         </ion-card-header>
@@ -280,7 +245,7 @@ import {
         </ion-card-content>
       </ion-card>
 
-      <ion-card>
+      <ion-card class="activity-card">
         <ion-card-header>
           <ion-card-title>Recent activity</ion-card-title>
         </ion-card-header>
@@ -301,16 +266,21 @@ import {
             </ion-list>
           } @else {
             <div class="empty">
-              <ion-icon name="cloud-offline-outline" size="large" color="medium" />
-              <p><ion-note>Nothing recorded yet. Add your first transaction from Activity.</ion-note></p>
+              <ion-icon name="list-outline" aria-hidden="true" />
+              <h3>Your story starts here.</h3>
+              <p>Nothing recorded yet. Add your first transaction from Activity.</p>
+              <a routerLink="/tabs/transactions">Go to Activity <ion-icon name="chevron-forward-outline" /></a>
             </div>
           }
         </ion-card-content>
       </ion-card>
+      <p class="dashboard-footnote"><ion-icon name="shield-checkmark-outline" /> Your ledger stays with you. Even when you’re offline.</p>
+      </div>
     </ion-content>
   `,
 })
 export class DashboardPage {
+  readonly currentMonth = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(new Date());
   readonly accounts = inject(AccountsService);
   readonly categories = inject(CategoriesService);
   readonly transactions = inject(TransactionsService);
@@ -396,6 +366,6 @@ export class DashboardPage {
   }
 
   constructor() {
-    addIcons({ arrowDownOutline, arrowUpOutline, chevronForwardOutline, cloudOfflineOutline });
+    addIcons({ pieChartOutline, listOutline, shieldCheckmarkOutline, arrowDownOutline, arrowUpOutline, chevronForwardOutline, cloudOfflineOutline });
   }
 }

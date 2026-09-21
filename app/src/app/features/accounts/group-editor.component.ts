@@ -54,7 +54,7 @@ export const GROUP_TYPES: ReadonlyArray<{
     value: 'loan',
     label: 'Loan',
     icon: 'trending-down-outline',
-    note: 'Money borrowed — a mortgage, a car loan. Counts as a liability, like a credit card.',
+    note: 'Money borrowed: a mortgage, a car loan. Counts as a liability, like a credit card.',
   },
 ];
 
@@ -70,7 +70,7 @@ export const GROUP_TYPES: ReadonlyArray<{
         </ion-buttons>
         <ion-title>{{ existing() ? 'Edit' : 'New' }} group</ion-title>
         <ion-buttons slot="end">
-          <ion-button strong="true" [disabled]="!canSave()" (click)="save()">Save</ion-button>
+          <ion-button strong="true" fill="solid" [disabled]="!canSave()" (click)="save()">Save</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>

@@ -189,7 +189,7 @@ export class SettingsPage {
       case 'git':
         return `Git · ${target.repoUrl}`;
       default:
-        return 'Not configured — this device only';
+        return 'Not configured · this device only';
     }
   });
 

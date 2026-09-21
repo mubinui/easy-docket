@@ -105,7 +105,7 @@ import { AccountsService } from '../../core/repositories/accounts.service';
           <ion-note>
             A backup holds your whole ledger, encrypted with the same key as everything else. It is
             useless without your passphrase, so keep the recovery bundle from the security screen
-            as well — one is the data, the other is the key.
+            as well. One is the data, the other is the key.
           </ion-note>
         </ion-item>
       </ion-list>
@@ -313,7 +313,7 @@ export class DataPage {
 
       const alert = await this.alerts.create({
         header: 'Restore this backup?',
-        message: `It holds ${countRows(payload)} row(s) from ${taken}. Anything you have changed since is kept — only older or missing records are restored.`,
+        message: `It holds ${countRows(payload)} row(s) from ${taken}. Anything you have changed since is kept. Only older or missing records are restored.`,
         buttons: [
           { text: 'Cancel', role: 'cancel' },
           {

@@ -159,7 +159,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
             @if (data().unconverted; as missing) {
               <p class="unconverted">
                 <ion-note color="warning">
-                  {{ missing }} transaction(s) left out — no rate to
+                  {{ missing }} transaction(s) left out: no rate to
                   {{ data().currency }}
                 </ion-note>
               </p>

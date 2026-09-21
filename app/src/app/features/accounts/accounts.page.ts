@@ -143,14 +143,14 @@ import {
         @if (unconverted().length) {
           <div class="warning">
             <ion-note color="warning">
-              Excludes {{ unconverted().join(', ') }} — add a rate to include them
+              Excludes {{ unconverted().join(', ') }}: add a rate to include them
             </ion-note>
           </div>
         }
         @if (excludedCount(); as excluded) {
           <div class="warning">
             <ion-note>
-              Not counting {{ excluded }} account{{ excluded === 1 ? '' : 's' }} —
+              Not counting {{ excluded }} account{{ excluded === 1 ? '' : 's' }} ·
               <a routerLink="/settings/totals">change</a>
             </ion-note>
           </div>
@@ -246,7 +246,7 @@ import {
       }
 
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button (click)="create()">
+        <ion-fab-button aria-label="Add account" (click)="create()">
           <ion-icon name="add-outline" />
         </ion-fab-button>
       </ion-fab>

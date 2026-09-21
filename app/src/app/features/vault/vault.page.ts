@@ -1,3 +1,6 @@
+import { CurrencyFieldComponent } from '../../shared/currency-field.component';
+import { LedgerDotsComponent } from '../../shared/ledger-dots.component';
+import { BrandMarkComponent } from '../../shared/brand-mark.component';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -6,7 +9,7 @@ import { lockClosedOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import { runInInjectionContext, EnvironmentInjector } from '@angular/core';
 import { activateVault } from '../../core/app-bootstrap';
 import { VaultService } from '../../core/keys/vault.service';
-import { COMMON_CURRENCIES, guessCurrency } from '../../core/money/currencies';
+import { guessCurrency } from '../../core/money/currencies';
 import { AccountGroupsService } from '../../core/repositories/account-groups.service';
 import { RatesService } from '../../core/repositories/rates.service';
 import { CategoriesService } from '../../core/repositories/categories.service';
@@ -16,8 +19,6 @@ import {
   IonIcon,
   IonInput,
   IonNote,
-  IonSelect,
-  IonSelectOption,
   IonSpinner,
   IonText,
 } from '@ionic/angular';
@@ -33,44 +34,25 @@ import {
 @Component({
   selector: 'app-vault',
   standalone: true,
-  imports: [FormsModule, IonButton, IonContent, IonIcon, IonInput, IonNote, IonSelect, IonSelectOption, IonSpinner, IonText],
-  styles: [
-    `
-      .vault {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        min-height: 100%;
-        padding: 2rem 1.5rem;
-        max-width: 26rem;
-        margin: 0 auto;
-        gap: 0.75rem;
-      }
-      .brand {
-        text-align: center;
-        margin-bottom: 1.5rem;
-      }
-      .brand ion-icon {
-        font-size: 3rem;
-        color: var(--ion-color-primary);
-      }
-      h1 {
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin: 0.5rem 0 0.25rem;
-      }
-      .error {
-        min-height: 1.25rem;
-      }
-    `,
-  ],
+  imports: [BrandMarkComponent, CurrencyFieldComponent, FormsModule, IonButton, IonContent, IonIcon, IonInput, IonNote, IonSpinner, IonText, LedgerDotsComponent],
+  styleUrls: ['./vault.page.scss'],
   template: `
     <ion-content>
+      <div class="vault-layout">
+      <section class="welcome-panel">
+        <div class="wordmark"><app-brand-mark />Easy Docket</div>
+        <div class="welcome-copy">
+          <h1>A clear view.<br />A calmer mind.</h1>
+          <p>All your accounts, everyday spending, and plans. In one personal space.</p>
+          <div class="welcome-detail"><ion-icon name="shield-checkmark-outline" /><div><strong>Personal by design.</strong><span>Your ledger is encrypted on your device.<br />You choose where it goes.</span></div></div>
+        </div>
+        <app-ledger-dots class="welcome-dots" />
+      </section>
       <div class="vault">
         <div class="brand">
           <ion-icon [name]="creating() ? 'shield-checkmark-outline' : 'lock-closed-outline'" />
-          <h1>Easy Docket</h1>
-          <ion-note>{{ creating() ? 'Set up your vault' : 'Welcome back' }}</ion-note>
+          <h2>{{ creating() ? 'Set up your vault' : 'Welcome back' }}</h2>
+          <p>{{ creating() ? 'A private home for your money.' : 'Your ledger is right where you left it.' }}</p>
         </div>
 
         <ion-input
@@ -78,13 +60,18 @@ import {
           labelPlacement="stacked"
           type="password"
           fill="outline"
-          autocomplete="current-password"
+          [autocomplete]="creating() ? 'new-password' : 'current-password'"
           [ngModel]="passphrase()"
           (ngModelChange)="passphrase.set($event)"
           (keyup.enter)="submit()"
         />
 
         @if (creating()) {
+          <!--
+            Checked as it is typed rather than only on submit. Finding out the
+            two do not match after pressing the button means retyping both,
+            and a passphrase that cannot be reset is a bad place to learn that.
+          -->
           <ion-input
             label="Confirm passphrase"
             labelPlacement="stacked"
@@ -93,11 +80,15 @@ import {
             autocomplete="new-password"
             [ngModel]="confirmation()"
             (ngModelChange)="confirmation.set($event)"
+            (ionBlur)="confirmationBlurred.set(true)"
             (keyup.enter)="submit()"
           />
+          @if (mismatch()) {
+            <ion-text color="danger"><small>The two passphrases do not match</small></ion-text>
+          }
           <ion-note>
-            This passphrase encrypts your ledger. It is never uploaded and cannot be reset — if you
-            lose it, the data is unrecoverable by design.
+            This passphrase encrypts your ledger. It is never uploaded and cannot be reset. Lose it
+            and the data is unrecoverable by design.
           </ion-note>
 
           <!--
@@ -106,30 +97,25 @@ import {
             a month later that the vault thinks in dollars is expensive to
             undo. It can still be changed later in Settings.
           -->
-          <ion-select
-            label="Currency"
-            labelPlacement="stacked"
+          <app-currency-field
             fill="outline"
-            [ngModel]="currency()"
-            (ngModelChange)="currency.set($event)"
-          >
-            @for (code of currencies; track code) {
-              <ion-select-option [value]="code">{{ code }}</ion-select-option>
-            }
-          </ion-select>
-          <ion-note>
-            Totals are shown in this, and your starter accounts open in it. Changeable later in
-            Settings.
-          </ion-note>
+            footnote="Totals use this, and your starter accounts open in it. Change it later in Settings."
+            [value]="currency()"
+            (valueChange)="currency.set($event)"
+          />
         }
 
-        <div class="error">
+        <div class="error" aria-live="polite">
           @if (error()) {
             <ion-text color="danger"><small>{{ error() }}</small></ion-text>
           }
         </div>
 
-        <ion-button expand="block" [disabled]="busy() || !passphrase()" (click)="submit()">
+        <ion-button
+          expand="block"
+          [disabled]="busy() || !passphrase() || (creating() && confirmation() !== passphrase())"
+          (click)="submit()"
+        >
           @if (busy()) {
             <ion-spinner name="dots" />
           } @else {
@@ -145,6 +131,7 @@ import {
           </ion-note>
         }
       </div>
+      </div>
     </ion-content>
   `,
 })
@@ -154,8 +141,6 @@ export class VaultPage {
   private readonly groups = inject(AccountGroupsService);
   private readonly rates = inject(RatesService);
 
-  readonly currencies = COMMON_CURRENCIES;
-
   /** Guessed from the device's locale, and shown as a choice rather than applied. */
   readonly currency = signal(guessCurrency());
   private readonly router = inject(Router);
@@ -163,10 +148,28 @@ export class VaultPage {
 
   readonly passphrase = signal('');
   readonly confirmation = signal('');
+
+  /** Whether the confirm field has been left, so it is not marked wrong mid-type. */
+  readonly confirmationBlurred = signal(false);
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
 
   readonly creating = computed(() => this.vault.status() === 'uninitialised');
+
+  /**
+   * Whether to say the two do not match yet.
+   *
+   * Only once the field has been left: calling a half-typed confirmation wrong
+   * on its first keystroke is noise, because it is wrong until the moment it
+   * is right.
+   */
+  readonly mismatch = computed(
+    () =>
+      this.creating() &&
+      this.confirmationBlurred() &&
+      this.confirmation().length > 0 &&
+      this.confirmation() !== this.passphrase(),
+  );
 
   async submit(): Promise<void> {
     if (this.busy()) return;
@@ -199,6 +202,7 @@ export class VaultPage {
       this.busy.set(false);
       this.passphrase.set('');
       this.confirmation.set('');
+      this.confirmationBlurred.set(false);
     }
   }
 

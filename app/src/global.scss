@@ -115,3 +115,156 @@ app-transaction-editor {
   flex: 1 1 auto;
   min-height: 0;
 }
+
+/* Easy Docket — a quiet, native-feeling workspace. */
+html { font-size: 16px; }
+body { -webkit-font-smoothing: antialiased; }
+::selection { background: var(--docket-selected); color: var(--ion-text-color); }
+a { color: var(--ion-color-primary); text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--ion-color-primary); outline-offset: 3px; }
+input, textarea { caret-color: var(--ion-color-primary); }
+/*
+ * Concealed text, spaced out.
+ *
+ * At the body's own tracking the bullets crowd into a grey smear, and a
+ * passphrase field is the one place where seeing exactly how many characters
+ * landed is the only feedback there is.
+ */
+input[type='password'] {
+  letter-spacing: 0.32em;
+  font-size: 17px;
+}
+input[type='password']::placeholder {
+  letter-spacing: normal;
+}
+
+/*
+ * A quiet scroll rail.
+ *
+ * The platform default paints a light track the width of a finger down the
+ * side of every panel, which is the loudest chrome on screen in a design that
+ * otherwise draws its edges in hairlines.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--docket-line) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--docket-line);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--docket-secondary);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+ion-content { --padding-bottom: 32px; }
+ion-header { box-shadow: none !important; }
+ion-header::after { display: none; }
+ion-toolbar { --border-width: 0; --min-height: 72px; --padding-start: 12px; --padding-end: 12px; }
+ion-title { font-size: 24px; font-weight: 700; letter-spacing: -0.025em; }
+ion-note { color: var(--docket-secondary); line-height: 1.5; }
+ion-card { margin: 16px; border-radius: var(--docket-radius); box-shadow: none; color: var(--ion-text-color); }
+ion-card-header { padding: 22px 24px 12px; }
+ion-card-title { font-size: 17px; font-weight: 650; letter-spacing: -0.015em; }
+ion-card-content { padding: 0 24px 22px !important; }
+ion-card ion-list { margin: 0; padding: 0; }
+ion-list { background: var(--ion-item-background); }
+ion-content > ion-list.list-md { margin: 16px; padding: 8px 0; border-radius: var(--docket-radius); overflow: hidden; }
+ion-list-header { min-height: 44px; font-size: 13px; font-weight: 600; color: var(--docket-secondary); letter-spacing: 0; }
+ion-item { --min-height: 64px; --padding-start: 20px; --inner-padding-end: 20px; --border-color: var(--ion-border-color); font-size: 15px; }
+ion-item h3 { font-size: 15px !important; font-weight: 550 !important; }
+ion-item p { line-height: 1.5 !important; color: var(--docket-secondary) !important; }
+ion-item ion-note[slot='end'] { font-size: 14px; font-weight: 550; font-variant-numeric: tabular-nums; }
+ion-item ion-icon[slot='start'] { font-size: 21px; color: var(--docket-secondary); margin-inline-end: 16px; }
+ion-item-divider { --background: var(--ion-background-color); --padding-start: 20px; min-height: 42px; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+ion-button { --border-radius: 9px; --box-shadow: none; font-weight: 550; text-transform: none; letter-spacing: 0; }
+ion-button:not([fill='clear']):not([size='small']) { min-height: 42px; }
+ion-fab { margin: 12px; }
+ion-fab-button { --border-radius: 18px; --box-shadow: 0 6px 18px #0000001a; }
+ion-searchbar { --background: var(--ion-card-background); --box-shadow: none; --border-radius: 10px; --placeholder-color: var(--docket-secondary); --placeholder-opacity: 1; padding-inline: 16px !important; }
+ion-input, ion-textarea, ion-select { --border-radius: 10px !important; --border-color: var(--docket-line); --highlight-color-focused: var(--ion-color-primary); }
+/*
+ * No green for merely having been typed in.
+ *
+ * Ionic colours a field with the success palette once it is touched and no
+ * validator objected. Nothing in this app registers a validator, so "valid"
+ * means only that nothing looked — and on a confirm-passphrase field that does
+ * not match, a green outline is an outright lie. Valid is the resting state
+ * here; a colour is reserved for a field that is actually wrong.
+ */
+ion-input.ion-valid:not(.ion-invalid),
+ion-textarea.ion-valid:not(.ion-invalid) {
+  --highlight-color-valid: var(--ion-color-primary);
+}
+ion-input.ion-valid:not(.ion-invalid):not(.has-focus) .label-text,
+ion-textarea.ion-valid:not(.ion-invalid):not(.has-focus) .label-text {
+  color: var(--docket-secondary);
+}
+ion-input.ion-valid:not(.ion-invalid):not(.has-focus) .input-outline-start,
+ion-input.ion-valid:not(.ion-invalid):not(.has-focus) .input-outline-notch,
+ion-input.ion-valid:not(.ion-invalid):not(.has-focus) .input-outline-end {
+  border-color: var(--docket-line);
+}
+ion-segment { background: var(--docket-sidebar); border-radius: 9px; padding: 3px; }
+ion-segment-button { --indicator-color: var(--ion-card-background); --indicator-height: 100%; --color: var(--docket-secondary); --color-checked: var(--ion-text-color); min-height: 38px; font-size: 13px; text-transform: none; letter-spacing: 0; }
+ion-segment-button::part(indicator-background) { border-radius: 7px; }
+ion-modal { --border-radius: 16px; --box-shadow: 0 24px 80px #00000030; }
+ion-modal ion-toolbar { --min-height: 64px; }
+ion-modal ion-title { font-size: 18px; }
+ion-modal ion-content { --padding-bottom: 24px; }
+ion-modal ion-list { border-radius: 0; }
+ion-modal ion-item { --min-height: 72px; }
+ion-alert { --background: var(--ion-card-background); }
+.empty { color: var(--docket-secondary); line-height: 1.6; }
+
+app-accounts .total { padding: 28px 24px 16px !important; }
+app-accounts .total strong { font-size: 34px !important; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+app-accounts .sheet { padding: 0 24px 24px !important; gap: 40px !important; }
+app-accounts .side { padding: 24px 24px 8px !important; }
+app-transactions .month { max-width: 420px; margin-inline: auto; }
+app-transactions ion-header ion-toolbar:not(:first-child) { --min-height: 52px; }
+app-transactions .totals { gap: 28px !important; padding-bottom: 12px !important; }
+app-settings ion-list:last-child ion-label p { max-width: 65ch; white-space: normal; }
+
+@media (min-width: 900px) {
+  /* Ionic owns the outlet; offset its content without covering interactive pages. */
+  app-tabs ion-tabs { padding-left: 232px; }
+  app-tabs ion-tabs > .tabs-inner { left: 0; }
+  app-tabs ion-tab-bar { display: none; }
+  ion-toolbar { --padding-start: 24px; --padding-end: 24px; --min-height: 84px; }
+  ion-title { font-size: 28px; }
+  ion-content { --padding-start: 24px; --padding-end: 24px; }
+  ion-content > ion-list.list-md { margin: 12px 16px 24px; }
+  ion-modal ion-content { --padding-start: 0; --padding-end: 0; }
+  app-settings ion-content { --padding-start: max(24px, calc((100% - 880px) / 2)); --padding-end: max(24px, calc((100% - 880px) / 2)); }
+}
+@media (max-width: 599px) {
+  ion-card-header { padding: 20px 20px 12px; }
+  ion-card-content { padding: 0 20px 20px !important; }
+  ion-tab-bar { --background: var(--ion-card-background); border-top: 1px solid var(--ion-border-color); min-height: 68px; padding-bottom: env(safe-area-inset-bottom); }
+  ion-tab-button { --color: var(--docket-secondary); --color-selected: var(--ion-color-primary); font-size: 11px; }
+  ion-tab-button ion-icon { font-size: 23px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Material-mode segments need a selected surface on the host, not only the
+   underline indicator, to read as a native segmented control. */
+ion-segment-button.segment-button-checked {
+  background: var(--ion-card-background);
+  border-radius: 7px;
+}
+ion-segment-button::part(indicator) { display: none; }
