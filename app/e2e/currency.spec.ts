@@ -2,6 +2,7 @@ import { expect, test } from './fixtures';
 import {
   Screen,
   addAccount,
+  chooseCurrency,
   chooseOption,
   createVault,
   fillField,
@@ -40,7 +41,7 @@ async function addEuroAccount(page: import('@playwright/test').Page) {
   await goToTab(page, 'Accounts', Screen.accounts);
   await tapAdd(page, Screen.accounts);
   await fillField(page, 'Name', 'Euro account');
-  await chooseOption(page, 'Currency', 'EUR');
+  await chooseCurrency(page, 'EUR');
   await fillField(page, 'Opening balance', '0.00');
   await tap(page, 'Save');
   await expect(page.locator(Screen.accounts).getByRole('heading', { name: 'Euro account' })).toBeVisible();

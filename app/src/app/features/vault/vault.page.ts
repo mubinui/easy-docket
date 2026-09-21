@@ -111,11 +111,7 @@ import {
           }
         </div>
 
-        <ion-button
-          expand="block"
-          [disabled]="busy() || !passphrase() || (creating() && confirmation() !== passphrase())"
-          (click)="submit()"
-        >
+        <ion-button expand="block" [disabled]="busy() || !passphrase()" (click)="submit()">
           @if (busy()) {
             <ion-spinner name="dots" />
           } @else {
@@ -176,7 +172,11 @@ export class VaultPage {
     this.error.set(null);
 
     if (this.creating() && this.passphrase() !== this.confirmation()) {
-      this.error.set('The two passphrases do not match');
+      // Said under the field rather than in the strip at the bottom: the box
+      // that has to change is the one that should be carrying the message.
+      this.confirmationBlurred.set(true);
+      // Empty is a different problem from wrong, and reads as one.
+      if (!this.confirmation()) this.error.set('Confirm your passphrase');
       return;
     }
 
