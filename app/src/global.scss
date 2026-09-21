@@ -191,6 +191,28 @@ ion-card ion-item { --border-radius: 10px; }
  * edge drawn just above it, which reads as a line that failed to reach.
  */
 ion-list > ion-item:last-of-type { --inner-border-width: 0; }
+/*
+ * The press state, which is the only shading a phone ever shows.
+ *
+ * Hover needs a pointer that can rest somewhere without committing, and a
+ * finger cannot: every :hover rule in this app is invisible on a touch screen.
+ * So the pressed state has to carry the whole job there, and it was carrying it
+ * in Ionic's Material grey, a good deal heavier than anything else here.
+ *
+ * Same shape as the hover shade and the selection tint the app already uses,
+ * eased rather than snapped so the touch reads as a response.
+ */
+ion-card ion-item {
+  --background-activated: var(--docket-selected);
+  --background-activated-opacity: 1;
+  --background-focused: var(--docket-selected);
+  --background-focused-opacity: 1;
+  --ripple-color: var(--docket-selected);
+}
+ion-card ion-item::part(native) { transition: background-color 140ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  ion-card ion-item::part(native) { transition: none; }
+}
 ion-list { background: var(--ion-item-background); }
 ion-content > ion-list.list-md { margin: 16px; padding: 8px 0; border-radius: var(--docket-radius); overflow: hidden; }
 ion-list-header { min-height: 44px; font-size: 13px; font-weight: 600; color: var(--docket-secondary); letter-spacing: 0; }
