@@ -16,11 +16,13 @@ ion-card { margin: 0; min-width: 0; }
 .budgets-card { grid-column: 2; }
 .activity-card { grid-column: 1 / -1; }
 /*
- * Rows carry no padding of their own, so the hover shade is the row box.
- * Pulled in 4px on each side it sits inside the card's content rather than
- * running the full width of it.
+ * The hover shade is the row box, so with no padding of its own the text sat
+ * flush against the shade's left edge while the chevron kept a margin on the
+ * right, which read as lopsided. The row is pulled in 4px on each side so the
+ * shade sits inside the card's content, and carries its own padding so the
+ * text has the same room inside the shade at both ends.
  */
-ion-item { --padding-start: 0; --inner-padding-end: 0; margin-inline: 4px; }
+ion-item { --padding-start: 12px; --inner-padding-end: 12px; margin-inline: 4px; }
 .bar { height: 5px; border-radius: 3px; background: var(--ion-background-color); overflow: hidden; margin-top: 12px; }
 .bar span { display: block; height: 100%; border-radius: inherit; }
 .empty { text-align: center; padding: 26px 10px; }
