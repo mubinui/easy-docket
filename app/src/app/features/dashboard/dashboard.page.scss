@@ -15,7 +15,13 @@ ion-card { margin: 0; min-width: 0; }
 .spending-card { grid-column: 1; }
 .budgets-card { grid-column: 2; }
 .activity-card { grid-column: 1 / -1; }
-ion-item { --padding-start: 0; --inner-padding-end: 0; }
+/*
+ * Rows line up with the card's title rather than carrying a row's usual
+ * padding. That left the hover shade stopping exactly at the text, so the row
+ * reaches 3px wider on each side and pays it back as padding: the shade gains
+ * room, the text stays on the same line as the title above it.
+ */
+ion-item { --padding-start: 3px; --inner-padding-end: 3px; margin-inline: -3px; }
 .bar { height: 5px; border-radius: 3px; background: var(--ion-background-color); overflow: hidden; margin-top: 12px; }
 .bar span { display: block; height: 100%; border-radius: inherit; }
 .empty { text-align: center; padding: 26px 10px; }

@@ -180,6 +180,12 @@ ion-card-header { padding: 22px 24px 12px; }
 ion-card-title { font-size: 17px; font-weight: 650; letter-spacing: -0.015em; }
 ion-card-content { padding: 0 24px 22px !important; }
 ion-card ion-list { margin: 0; padding: 0; }
+/*
+ * An item inside a card is inset from the card's own edges, so its hover and
+ * press surfaces are the only thing drawing their own shape. Left square they
+ * read as a grey rectangle pasted onto a rounded card.
+ */
+ion-card ion-item { --border-radius: 10px; }
 ion-list { background: var(--ion-item-background); }
 ion-content > ion-list.list-md { margin: 16px; padding: 8px 0; border-radius: var(--docket-radius); overflow: hidden; }
 ion-list-header { min-height: 44px; font-size: 13px; font-weight: 600; color: var(--docket-secondary); letter-spacing: 0; }
