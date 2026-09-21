@@ -42,7 +42,7 @@ import { CategoriesService } from '../../core/repositories/categories.service';
         </ion-buttons>
         <ion-title>{{ existing() ? 'Edit' : 'New' }} category</ion-title>
         <ion-buttons slot="end">
-          <ion-button strong="true" [disabled]="!canSave()" (click)="save()">Save</ion-button>
+          <ion-button strong="true" fill="solid" [disabled]="!canSave()" (click)="save()">Save</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>

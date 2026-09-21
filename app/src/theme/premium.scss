@@ -1,0 +1,235 @@
+/* Light catches the surfaces that sit above the workspace. */
+ion-card,
+ion-content > ion-list.list-md {
+  box-shadow: var(--docket-surface-light), var(--docket-elevation);
+}
+ion-card-header { padding-top: 24px; }
+ion-card-title { letter-spacing: -0.02em; }
+/* One control vocabulary: filled action, quiet secondary, compact toolbar. */
+ion-button {
+  --border-radius: 12px;
+  --padding-start: 20px;
+  --padding-end: 20px;
+  --background-hover-opacity: 0;
+  --background-activated-opacity: 0;
+  --ripple-color: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+ion-button.button-solid,
+ion-toolbar ion-button[strong='true'] {
+  --background: linear-gradient(180deg, #1470d5, #005cc4);
+  --color: #fff;
+  --color-hover: #fff;
+  --color-focused: #fff;
+  --color-activated: #fff;
+  --box-shadow: inset 0 1px 0 #ffffff40, inset 0 -1px 0 #003b8733, 0 2px 3px #004b9f14, 0 6px 12px -5px #004b9f50;
+}
+ion-button.button-solid.ion-color {
+  --background: var(--ion-color-base);
+  --box-shadow: inset 0 1px 0 #ffffff26, var(--docket-control-elevation);
+}
+ion-button.button-outline {
+  --border-width: 1px;
+  --border-color: var(--docket-line);
+  --background: var(--ion-card-background);
+  --box-shadow: 0 2px 4px #00000005;
+}
+ion-button::part(native), ion-fab-button::part(native) {
+  transition: transform 140ms ease-out, box-shadow 140ms ease-out, filter 140ms ease-out;
+}
+ion-button:not(.button-disabled):active::part(native),
+ion-fab-button:not(.fab-button-disabled):active::part(native) {
+  transform: translateY(1px) scale(0.98);
+  filter: brightness(0.94);
+  box-shadow: inset 0 2px 4px #00000014;
+}
+ion-button::part(native):focus-visible,
+ion-fab-button::part(native):focus-visible {
+  outline: 3px solid var(--ion-color-primary);
+  outline-offset: 4px;
+}
+ion-button.button-disabled.button-disabled {
+  opacity: 1;
+  --background: var(--docket-sidebar);
+  --color: var(--docket-secondary);
+  --box-shadow: none;
+  --border-color: transparent;
+}
+ion-button.button-disabled::part(native) { opacity: 0.7; }
+ion-toolbar ion-button {
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --border-radius: 10px;
+  min-height: 38px !important;
+  margin-inline: 3px;
+}
+ion-toolbar ion-button[strong='true'] { min-width: 72px; }
+ion-button ion-icon[slot='start'] { margin-inline-end: 8px; font-size: 18px; }
+ion-button ion-icon[slot='end'] { margin-inline-start: 8px; font-size: 18px; }
+ion-button ion-spinner { width: 22px; height: 22px; }
+ion-fab-button {
+  --border-radius: 19px;
+  --background: linear-gradient(155deg, #1470d5, #005cc4);
+  --color: #fff;
+  --box-shadow: inset 0 1px 0 #ffffff60, inset 0 -1px 0 #003b8755, 0 3px 6px #0055b826, 0 10px 20px -6px #0055b860;
+}
+ion-fab-button ion-icon { font-size: 26px; }
+@media (hover: hover) and (pointer: fine) {
+  ion-button:not(.button-disabled):hover::part(native),
+  ion-fab-button:not(.fab-button-disabled):hover::part(native) { filter: brightness(1.07); }
+  ion-button.button-clear:not([strong='true']):not(.button-disabled):hover {
+    --background: var(--docket-selected);
+  }
+  ion-button.button-outline:not(.button-disabled):hover { --border-color: var(--ion-color-primary); }
+}
+ion-segment { box-shadow: inset 0 1px 3px #0000000a; }
+ion-segment-button.segment-button-checked { box-shadow: var(--docket-control-elevation); }
+ion-searchbar { --box-shadow: var(--docket-control-elevation); }
+ion-modal { --box-shadow: 0 10px 30px #00000026, 0 40px 100px #00000040; }
+ion-content > ion-list.list-md { padding-top: 0; padding-bottom: 0; }
+ion-list-header { padding-top: 12px; padding-bottom: 8px; }
+
+app-tabs .sidebar {
+  background: linear-gradient(165deg, var(--ion-card-background) -80%, var(--docket-sidebar) 80%);
+  border-right: 0;
+  box-shadow: inset -1px 0 0 var(--docket-line);
+}
+app-tabs .sidebar nav a { border-radius: 11px; }
+app-tabs .sidebar nav a.active {
+  background: var(--ion-card-background);
+  box-shadow: var(--docket-surface-light), var(--docket-control-elevation);
+}
+app-tabs .identity img,
+:root app-vault.ion-page .wordmark img {
+  box-sizing: content-box;
+  padding: 7px;
+  border-radius: 12px;
+  background: var(--ion-card-background);
+  box-shadow: var(--docket-surface-light), var(--docket-control-elevation);
+}
+
+:root app-dashboard.ion-page .balance-card {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(120deg, #354762 0%, #1b2a42 52%, #101b2f 100%);
+  color: #fff;
+  box-shadow: inset 0 1px 0 #ffffff38, 0 5px 8px #14274414, 0 18px 32px -12px #14274466;
+}
+/* A broad light reflection across the balance surface, never over the data. */
+:root app-dashboard.ion-page .balance-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 45%, #ffffff06 45.2%, #ffffff0a 72%, transparent 72.2%);
+  pointer-events: none;
+  z-index: -1;
+}
+:root app-dashboard.ion-page .balance-card ion-card-title,
+:root app-dashboard.ion-page .balance-card ion-note { color: #c8d6e9; }
+:root app-dashboard.ion-page .balance-card ion-card-header { padding-bottom: 16px; }
+:root app-dashboard.ion-page .balance-card .net-worth { font-weight: 550; text-shadow: 0 2px 3px #00000014; }
+:root app-dashboard.ion-page .balance-card ion-note[color='warning'] { color: #ffe19a; }
+:root app-dashboard.ion-page .flow > ion-icon {
+  border-radius: 13px;
+  background: var(--ion-card-background);
+  box-shadow: var(--docket-surface-light), var(--docket-control-elevation);
+}
+:root app-dashboard.ion-page .month-label {
+  background: var(--ion-card-background);
+  box-shadow: var(--docket-control-elevation);
+  padding: 9px 14px;
+  border-radius: 9px;
+}
+:root app-dashboard.ion-page .bar { height: 6px; box-shadow: inset 0 1px 2px #00000008; }
+
+:root app-vault.ion-page .vault-layout { gap: 32px; padding: 24px; }
+:root app-vault.ion-page .welcome-panel {
+  min-height: calc(100vh - 48px);
+  border-radius: 24px;
+  background: linear-gradient(145deg, #354762, #1b2a42 55%, #101b2f);
+  box-shadow: inset 0 1px 0 #ffffff30, 0 16px 36px -20px #14274470;
+  color: #fff;
+}
+:root app-vault.ion-page .welcome-copy > p,
+:root app-vault.ion-page .welcome-detail span,
+:root app-vault.ion-page .welcome-footer { color: #c8d6e9; }
+:root app-vault.ion-page .welcome-detail ion-icon { color: #8bc4ff; }
+:root app-vault.ion-page .vault {
+  background: var(--ion-card-background);
+  box-shadow: var(--docket-surface-light), var(--docket-elevation);
+  border-radius: 20px;
+  padding: 36px;
+  max-width: 468px;
+}
+:root app-vault.ion-page .brand ion-icon {
+  color: #fff;
+  background: linear-gradient(145deg, #469fff, #0965cd);
+  box-shadow: inset 0 1px 0 #ffffff70, 0 6px 10px #0066cc1a, 0 14px 24px -10px #0066cc66;
+  transform: rotate(-6deg);
+}
+@media (max-width: 749px) {
+  :root app-vault.ion-page .vault-layout { padding: 16px; gap: 12px; }
+  :root app-vault.ion-page .welcome-panel { min-height: auto; padding: 8px 8px 16px; background: transparent; box-shadow: none; color: var(--ion-text-color); }
+  :root app-vault.ion-page .vault { padding: 28px 24px; }
+}
+@media (max-width: 650px) {
+  :root app-dashboard.ion-page .page-intro { padding-bottom: 4px; }
+  :root app-dashboard.ion-page .page-intro h1 { font-size: 24px; }
+  :root app-dashboard.ion-page .page-intro p { font-size: 13px; }
+  :root app-dashboard.ion-page .month-label { display: inline-block; margin-top: 12px; padding: 7px 10px; }
+}
+@media (max-width: 899px) {
+  app-tabs ion-tab-bar {
+    --background: var(--docket-glass);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 -4px 24px #25334b0a;
+  }
+  app-tabs ion-tab-button.tab-selected ion-icon {
+    background: var(--docket-selected);
+    border-radius: 9px;
+    padding: 4px 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ion-button::part(native), ion-fab-button::part(native) { transition: none; }
+}
+
+/* Explicitly filled editor actions retain their shape inside Ionic toolbars. */
+ion-toolbar ion-buttons ion-button.button-solid {
+  --border-radius: 10px;
+  --background: linear-gradient(180deg, #1470d5, #005cc4);
+  --color: #fff;
+}
+ion-toolbar ion-buttons ion-button.button-disabled {
+  --background: var(--docket-sidebar);
+  --color: var(--docket-secondary);
+  --box-shadow: none;
+}
+:root app-vault.ion-page .welcome-dots { color: #c8d6e9; padding: 12px 0 16px; }
+:root app-vault.ion-page .wordmark app-brand-mark {
+  background: #ffffff0d;
+  color: #b8d8ff;
+  box-shadow: inset 0 1px 0 #ffffff26, 0 3px 8px #00000018;
+}
+@media (max-width: 749px) {
+  :root app-vault.ion-page .welcome-dots { display: none; }
+  :root app-vault.ion-page .wordmark app-brand-mark {
+    color: var(--ion-color-primary);
+    background: var(--ion-card-background);
+    box-shadow: var(--docket-control-elevation);
+  }
+}
+
+/* Style the native part because Ionic's toolbar palette overrides host colors. */
+ion-toolbar ion-button[strong='true']::part(native) {
+  background: linear-gradient(180deg, #1470d5, #005cc4);
+  color: #fff;
+  border-radius: 10px;
+}
+ion-toolbar ion-button[strong='true'].button-disabled::part(native) {
+  background: var(--docket-sidebar);
+  color: var(--docket-secondary);
+  box-shadow: none;
+}

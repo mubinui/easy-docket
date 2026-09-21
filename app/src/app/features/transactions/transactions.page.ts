@@ -83,11 +83,11 @@ import {
       </ion-toolbar>
       <ion-toolbar>
         <div class="month">
-          <ion-button fill="clear" (click)="shift(-1)">
+          <ion-button fill="clear" (click)="shift(-1)" aria-label="Previous month">
             <ion-icon slot="icon-only" name="chevron-back-outline" />
           </ion-button>
           <strong>{{ monthLabel() }}</strong>
-          <ion-button fill="clear" (click)="shift(1)">
+          <ion-button fill="clear" (click)="shift(1)" aria-label="Next month">
             <ion-icon slot="icon-only" name="chevron-forward-outline" />
           </ion-button>
         </div>
@@ -145,7 +145,7 @@ import {
       }
 
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button [disabled]="!accounts.active().length" (click)="create()">
+        <ion-fab-button aria-label="Add transaction" [disabled]="!accounts.active().length" (click)="create()">
           <ion-icon name="add-outline" />
         </ion-fab-button>
       </ion-fab>

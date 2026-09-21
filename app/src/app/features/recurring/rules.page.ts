@@ -120,7 +120,7 @@ import { RuleEditorComponent } from './rule-editor.component';
       }
 
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button [disabled]="!accountsExist()" (click)="create()">
+        <ion-fab-button aria-label="Add recurring rule" [disabled]="!accountsExist()" (click)="create()">
           <ion-icon name="add-outline" />
         </ion-fab-button>
       </ion-fab>

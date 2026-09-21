@@ -39,7 +39,7 @@
                 "output": "./svg"
               }
             ],
-            "styles": ["src/global.scss", "src/theme/variables.scss"],
+            "styles": ["src/global.scss", "src/theme/variables.scss", "src/theme/premium.scss"],
             "allowedCommonJsDependencies": [
               "async-lock",
               "crc-32",

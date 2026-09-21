@@ -1,0 +1,39 @@
+.dashboard-layout { max-width: 1180px; margin: 0 auto; padding: 6px 16px 20px; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; }
+.page-intro { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 12px 4px 14px; }
+h1 { font-size: 30px; font-weight: 650; letter-spacing: -.03em; margin: 0 0 8px; }
+.page-intro p { margin: 0; color: var(--docket-secondary); font-size: 15px; }
+.month-label { white-space: nowrap; color: var(--docket-secondary); font-size: 13px; }
+ion-card { margin: 0; min-width: 0; }
+.balance-card { padding-bottom: 12px; }
+.balance-card ion-card-title { font-size: 14px; font-weight: 500; color: var(--docket-secondary); }
+.net-worth { font-size: 44px; line-height: 1.2; font-weight: 650; letter-spacing: -.035em; margin: 4px 0 12px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.flows { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 12px; }
+.flow { display: flex; gap: 12px; align-items: center; }
+.flow > ion-icon { flex-shrink: 0; font-size: 20px; padding: 10px; border-radius: 50%; background: var(--ion-background-color); }
+.flow strong { display: block; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.flow ion-note { font-size: 12px; }
+.spending-card { grid-column: 1; }
+.budgets-card { grid-column: 2; }
+.activity-card { grid-column: 1 / -1; }
+ion-item { --padding-start: 0; --inner-padding-end: 0; }
+.bar { height: 5px; border-radius: 3px; background: var(--ion-background-color); overflow: hidden; margin-top: 12px; }
+.bar span { display: block; height: 100%; border-radius: inherit; }
+.empty { text-align: center; padding: 26px 10px; }
+.empty > ion-icon { color: var(--docket-secondary); font-size: 30px; margin-bottom: 6px; }
+.empty h3 { margin: 8px 0; color: var(--ion-text-color); font-size: 16px; font-weight: 550; }
+.empty p { margin: 0 auto 18px; max-width: 36ch; font-size: 13px; }
+.empty a { font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; min-height: 32px; }
+.budget-name { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.budget-name ion-note { font-size: 11px; }
+.dashboard-footnote { grid-column: 1 / -1; color: var(--docket-secondary); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; margin: 10px 0; }
+@media (max-width: 1150px) { .flow { gap: 8px; } .flow > ion-icon { padding: 7px; } .flow strong { font-size: 18px; } }
+@media (max-width: 650px) {
+  .dashboard-layout { grid-template-columns: 1fr; gap: 16px; }
+  .page-intro { padding-top: 6px; display: block; }
+  h1 { font-size: 26px; }
+  .month-label { display: block; margin-top: 16px; font-size: 12px; }
+  .spending-card, .budgets-card { grid-column: 1; }
+  .net-worth { font-size: 40px; }
+  .flow strong { font-size: 22px; }
+  .dashboard-footnote { font-size: 11px; }
+}
