@@ -83,6 +83,8 @@
   --docket-control-elevation: 0 1px 2px #25334b0d, 0 3px 7px -4px #25334b26;
   --docket-surface-light: inset 0 1px 0 #ffffff99;
   --docket-glass: #f0f2f6e8;
+  /* A control lifted out of a well: the segment's selected chip. */
+  --docket-raised: #ffffff;
 }
 :root.ion-palette-dark {
   --ion-background-color: #14161b;
@@ -97,4 +99,10 @@
   --docket-control-elevation: 0 1px 3px #0000002e, 0 3px 8px -5px #00000059;
   --docket-surface-light: inset 0 1px 0 #ffffff0a;
   --docket-glass: #14161be8;
+  /*
+   * Lighter than the card, not equal to it. Reusing the card colour put the
+   * selected chip nine values away from the well it sits in, which is no
+   * distance at all: in dark the control read as having nothing selected.
+   */
+  --docket-raised: #343b4a;
 }

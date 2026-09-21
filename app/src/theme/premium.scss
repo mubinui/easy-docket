@@ -93,7 +93,9 @@ ion-fab-button ion-icon { font-size: 26px; }
   ion-button.button-outline:not(.button-disabled):hover { --border-color: var(--ion-color-primary); }
 }
 ion-segment { box-shadow: inset 0 1px 3px #0000000a; }
-ion-segment-button.segment-button-checked { box-shadow: var(--docket-control-elevation); }
+ion-segment-button.segment-button-checked {
+  box-shadow: var(--docket-surface-light), var(--docket-control-elevation);
+}
 /*
  * The search field, in the app's own language rather than Material's.
  *

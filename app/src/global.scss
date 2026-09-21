@@ -192,6 +192,28 @@ ion-card ion-item { --border-radius: 10px; }
  */
 ion-list > ion-item:last-of-type { --inner-border-width: 0; }
 /*
+ * Rounded ends, drawn rather than clipped.
+ *
+ * A square-cornered row inside a rounded, clipped card leaves a chip in the
+ * corner: the clip runs along the padding box while the border draws on the
+ * border box, and the row's own corner antialiases into the 1px between them.
+ * Rounding the first and last rows to the card's inner radius means there is
+ * nothing left in the corner for the clip to cut.
+ *
+ * 15px is the card's 16px radius less its 1px border: concentric with it.
+ */
+ion-content > ion-list.list-md > *:first-child {
+  border-start-start-radius: 15px;
+  border-start-end-radius: 15px;
+}
+ion-content > ion-list.list-md > *:last-child {
+  border-end-start-radius: 15px;
+  border-end-end-radius: 15px;
+}
+ion-content > ion-list.list-md > ion-item:first-child { --border-radius: 15px 15px 0 0; }
+ion-content > ion-list.list-md > ion-item:last-child { --border-radius: 0 0 15px 15px; }
+ion-content > ion-list.list-md > ion-item:only-child { --border-radius: 15px; }
+/*
  * The press state, which is the only shading a phone ever shows.
  *
  * Hover needs a pointer that can rest somewhere without committing, and a
@@ -266,7 +288,7 @@ ion-input.ion-valid:not(.ion-invalid):not(.has-focus) .input-outline-end {
   border-color: var(--docket-line);
 }
 ion-segment { background: var(--docket-sidebar); border-radius: 9px; padding: 3px; }
-ion-segment-button { --indicator-color: var(--ion-card-background); --indicator-height: 100%; --color: var(--docket-secondary); --color-checked: var(--ion-text-color); min-height: 38px; font-size: 13px; text-transform: none; letter-spacing: 0; }
+ion-segment-button { --indicator-color: var(--docket-raised); --indicator-height: 100%; --color: var(--docket-secondary); --color-checked: var(--ion-text-color); min-height: 38px; font-size: 13px; text-transform: none; letter-spacing: 0; }
 ion-segment-button::part(indicator-background) { border-radius: 7px; }
 ion-modal { --border-radius: 16px; --box-shadow: 0 24px 80px #00000030; }
 ion-modal ion-toolbar { --min-height: 64px; }
@@ -312,7 +334,8 @@ app-settings ion-list:last-child ion-label p { max-width: 65ch; white-space: nor
 /* Material-mode segments need a selected surface on the host, not only the
    underline indicator, to read as a native segmented control. */
 ion-segment-button.segment-button-checked {
-  background: var(--ion-card-background);
-  border-radius: 7px;
+  background: var(--docket-raised);
+  /* 6px is the track's 9px less its 3px padding: concentric, not guessed. */
+  border-radius: 6px;
 }
 ion-segment-button::part(indicator) { display: none; }
