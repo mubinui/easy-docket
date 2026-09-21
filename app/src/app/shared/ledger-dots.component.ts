@@ -7,14 +7,21 @@ import { Component } from '@angular/core';
   template: `<figure>
     <svg viewBox="0 0 360 112" aria-hidden="true" focusable="false">
       @for (dot of dots; track $index) {
-        <circle [attr.cx]="dot.x" [attr.cy]="dot.y" r="3" [attr.fill]="dot.color"
+        <circle [attr.cx]="dot.x" [attr.cy]="dot.y" r="3" [style.fill]="dot.color"
           [style.--dx]="dot.dx + 'px'" [style.--dy]="dot.dy + 'px'" [style.animation-delay]="dot.delay + 'ms'" />
       }
     </svg>
     <figcaption>Every transaction, in its place.</figcaption>
   </figure>`,
   styles: [`
-    :host { display: block; }
+    :host {
+      display: block;
+      /* Tuned for the dark welcome panel; the mobile layout redefines them. */
+      --ledger-dot-1: #9cc9ff;
+      --ledger-dot-2: #8dd6c0;
+      --ledger-dot-3: #c4cfff;
+      --ledger-dot-idle: #ffffff20;
+    }
     figure { margin: 0; }
     svg { display: block; width: 100%; max-width: 360px; height: auto; overflow: visible; }
     circle { animation: settle 1800ms cubic-bezier(.16,1,.3,1) both; }
@@ -28,7 +35,7 @@ export class LedgerDotsComponent {
     const row = Math.floor(i / 22);
     const col = i % 22;
     return { x: 12 + col * 15, y: 24 + row * 30,
-      color: col < [18, 13, 9][row] ? ['#9cc9ff', '#8dd6c0', '#c4cfff'][row] : '#ffffff20',
+      color: col < [18, 13, 9][row] ? `var(--ledger-dot-${row + 1})` : 'var(--ledger-dot-idle)',
       dx: Math.sin(i * 2.4) * 35, dy: Math.cos(i * 1.7) * 22, delay: col * 18 + row * 70 };
   });
 }
