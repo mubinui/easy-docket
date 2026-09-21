@@ -79,9 +79,9 @@
   --ion-toolbar-background: #f0f2f6;
   --docket-sidebar: #e8ecf2;
   --docket-radius: 16px;
-  --docket-elevation: 0 3px 5px #25334b04, 0 12px 28px -12px #25334b26;
-  --docket-control-elevation: 0 2px 3px #25334b0d, 0 5px 12px -5px #25334b33;
-  --docket-surface-light: inset 0 1px 0 #ffffffcc;
+  --docket-elevation: 0 1px 2px #25334b08, 0 6px 16px -10px #25334b1f;
+  --docket-control-elevation: 0 1px 2px #25334b0d, 0 3px 7px -4px #25334b26;
+  --docket-surface-light: inset 0 1px 0 #ffffff99;
   --docket-glass: #f0f2f6e8;
 }
 :root.ion-palette-dark {
@@ -89,10 +89,12 @@
   --ion-background-color-rgb: 20, 22, 27;
   --ion-toolbar-background: #14161b;
   --docket-sidebar: #1a1e26;
-  --ion-card-background: #242830;
-  --ion-item-background: #242830;
-  --docket-elevation: 0 3px 6px #0000001a, 0 16px 32px -12px #00000066;
-  --docket-control-elevation: 0 2px 4px #00000033, 0 6px 12px -5px #00000080;
-  --docket-surface-light: inset 0 1px 0 #ffffff0d;
+  --ion-card-background: #23272f;
+  --ion-item-background: #23272f;
+  --docket-line: #343945;
+  --ion-border-color: #2e333d;
+  --docket-elevation: 0 1px 3px #00000026, 0 8px 20px -12px #0000004d;
+  --docket-control-elevation: 0 1px 3px #0000002e, 0 3px 8px -5px #00000059;
+  --docket-surface-light: inset 0 1px 0 #ffffff0a;
   --docket-glass: #14161be8;
 }

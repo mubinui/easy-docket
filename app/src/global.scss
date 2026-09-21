@@ -37,8 +37,8 @@
 
 /* Sticky day headers in the activity list need an opaque background to sit on. */
 ion-item-divider {
-  --background: var(--ion-background-color, #fff);
-  --color: var(--ion-color-medium);
+  --background: var(--ion-item-background, #fff);
+  --color: var(--docket-secondary);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -188,10 +188,25 @@ ion-item h3 { font-size: 15px !important; font-weight: 550 !important; }
 ion-item p { line-height: 1.5 !important; color: var(--docket-secondary) !important; }
 ion-item ion-note[slot='end'] { font-size: 14px; font-weight: 550; font-variant-numeric: tabular-nums; }
 ion-item ion-icon[slot='start'] { font-size: 21px; color: var(--docket-secondary); margin-inline-end: 16px; }
-ion-item-divider { --background: var(--ion-background-color); --padding-start: 20px; min-height: 42px; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+/*
+ * A row carrying nothing but a note is a caption, not something to tap.
+ *
+ * It was inheriting the 64px row height meant for tappable rows, which left a
+ * card's worth of dead space under a single line of 12px text and made every
+ * card end at a different distance from its last words.
+ */
+ion-item:has(> ion-note:only-child) {
+  --min-height: 0;
+  --padding-top: 2px;
+  --padding-bottom: 18px;
+}
+/* The rule above a caption belongs to the card, not to the row it follows. */
+ion-item:has(+ ion-item > ion-note:only-child) { --border-width: 0; }
+ion-item-divider { --background: var(--ion-item-background); --padding-start: 20px; min-height: 46px; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; border-bottom: 1px solid var(--ion-border-color); }
 ion-button { --border-radius: 9px; --box-shadow: none; font-weight: 550; text-transform: none; letter-spacing: 0; }
 ion-button:not([fill='clear']):not([size='small']) { min-height: 42px; }
 ion-fab { margin: 12px; }
+app-accounts ion-content, app-transactions ion-content, app-budgets ion-content, app-rules ion-content { --padding-bottom: 96px; }
 ion-fab-button { --border-radius: 18px; --box-shadow: 0 6px 18px #0000001a; }
 ion-searchbar { --background: var(--ion-card-background); --box-shadow: none; --border-radius: 10px; --placeholder-color: var(--docket-secondary); --placeholder-opacity: 1; padding-inline: 16px !important; }
 ion-input, ion-textarea, ion-select { --border-radius: 10px !important; --border-color: var(--docket-line); --highlight-color-focused: var(--ion-color-primary); }

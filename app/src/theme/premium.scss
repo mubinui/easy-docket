@@ -1,6 +1,14 @@
-/* Light catches the surfaces that sit above the workspace. */
+/*
+ * Light catches the surfaces that sit above the workspace.
+ *
+ * The hairline is what actually separates a card from the page; the shadow
+ * only suggests height. Drawing the edge means the depth can come down to a
+ * hint without the surfaces dissolving into the background, which is what was
+ * happening in dark mode where card and page were a few values apart.
+ */
 ion-card,
 ion-content > ion-list.list-md {
+  border: 1px solid var(--docket-line);
   box-shadow: var(--docket-surface-light), var(--docket-elevation);
 }
 ion-card-header { padding-top: 24px; }
@@ -24,7 +32,7 @@ ion-toolbar ion-button[strong='true'] {
   --color-hover: #fff;
   --color-focused: #fff;
   --color-activated: #fff;
-  --box-shadow: inset 0 1px 0 #ffffff40, inset 0 -1px 0 #003b8733, 0 2px 3px #004b9f14, 0 6px 12px -5px #004b9f50;
+  --box-shadow: inset 0 1px 0 #ffffff33, 0 1px 2px #004b9f14, 0 4px 10px -5px #004b9f40;
 }
 ion-button.button-solid.ion-color {
   --background: var(--ion-color-base);
@@ -73,7 +81,7 @@ ion-fab-button {
   --border-radius: 19px;
   --background: linear-gradient(155deg, #1470d5, #005cc4);
   --color: #fff;
-  --box-shadow: inset 0 1px 0 #ffffff60, inset 0 -1px 0 #003b8755, 0 3px 6px #0055b826, 0 10px 20px -6px #0055b860;
+  --box-shadow: inset 0 1px 0 #ffffff4d, 0 2px 4px #0055b81f, 0 6px 14px -6px #0055b84d;
 }
 ion-fab-button ion-icon { font-size: 26px; }
 @media (hover: hover) and (pointer: fine) {
@@ -86,7 +94,34 @@ ion-fab-button ion-icon { font-size: 26px; }
 }
 ion-segment { box-shadow: inset 0 1px 3px #0000000a; }
 ion-segment-button.segment-button-checked { box-shadow: var(--docket-control-elevation); }
-ion-searchbar { --box-shadow: var(--docket-control-elevation); }
+/*
+ * The search field, in the app's own language rather than Material's.
+ *
+ * Scoped under :root deliberately. Ionic sets its defaults on the host class
+ * `.sc-ion-searchbar-md-h`, which outranks a bare `ion-searchbar` selector, so
+ * every custom property set in global.scss was being dropped and the field
+ * rendered as stock Material: a 2px radius, the page colour behind it and a
+ * three-layer elevation shadow no other control in the app uses.
+ */
+:root ion-searchbar {
+  --background: var(--ion-card-background);
+  --border-radius: 12px;
+  --box-shadow: var(--docket-control-elevation);
+  --color: var(--ion-text-color);
+  --icon-color: var(--docket-secondary);
+  --clear-button-color: var(--docket-secondary);
+  --placeholder-color: var(--docket-secondary);
+  --placeholder-opacity: 1;
+}
+:root ion-searchbar .searchbar-input {
+  border: 1px solid var(--docket-line);
+  height: 44px;
+  font-size: 15px;
+}
+:root ion-searchbar .searchbar-search-icon {
+  inset-inline-start: 13px;
+  width: 19px;
+}
 ion-modal { --box-shadow: 0 10px 30px #00000026, 0 40px 100px #00000040; }
 ion-content > ion-list.list-md { padding-top: 0; padding-bottom: 0; }
 ion-list-header { padding-top: 12px; padding-bottom: 8px; }
@@ -115,7 +150,7 @@ app-tabs .identity img,
   isolation: isolate;
   background: linear-gradient(120deg, #354762 0%, #1b2a42 52%, #101b2f 100%);
   color: #fff;
-  box-shadow: inset 0 1px 0 #ffffff38, 0 5px 8px #14274414, 0 18px 32px -12px #14274466;
+  box-shadow: inset 0 1px 0 #ffffff2e, 0 2px 4px #1427440f, 0 10px 24px -14px #1427444d;
 }
 /* A broad light reflection across the balance surface, never over the data. */
 :root app-dashboard.ion-page .balance-card::before {
@@ -166,7 +201,7 @@ app-tabs .identity img,
 :root app-vault.ion-page .brand ion-icon {
   color: #fff;
   background: linear-gradient(145deg, #469fff, #0965cd);
-  box-shadow: inset 0 1px 0 #ffffff70, 0 6px 10px #0066cc1a, 0 14px 24px -10px #0066cc66;
+  box-shadow: inset 0 1px 0 #ffffff59, 0 2px 6px #0066cc14, 0 8px 18px -10px #0066cc4d;
   transform: rotate(-6deg);
 }
 @media (max-width: 749px) {
