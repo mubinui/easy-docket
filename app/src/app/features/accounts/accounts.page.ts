@@ -8,6 +8,7 @@ import {
   folderOutline,
   phonePortraitOutline,
   saveOutline,
+  trendingDownOutline,
   trendingUpOutline,
   walletOutline,
 } from 'ionicons/icons';
@@ -493,6 +494,7 @@ export class AccountsPage {
       cardOutline,
       phonePortraitOutline,
       saveOutline,
+      trendingDownOutline,
       trendingUpOutline,
     });
   }

@@ -215,17 +215,41 @@ app-tabs .identity img,
   :root app-dashboard.ion-page .page-intro p { font-size: 13px; }
   :root app-dashboard.ion-page .month-label { display: inline-block; margin-top: 12px; padding: 7px 10px; }
 }
+/*
+ * The bar the app is actually used from.
+ *
+ * A hairline rather than a shadow, so it sits against the page the way every
+ * other edge in the app does. The selected pill is drawn on every tab and only
+ * filled on the current one, which keeps the icons on one baseline instead of
+ * letting the selected one shift as a background appears under it.
+ */
 @media (max-width: 899px) {
   app-tabs ion-tab-bar {
     --background: var(--docket-glass);
-    backdrop-filter: blur(18px);
-    box-shadow: 0 -4px 24px #25334b0a;
+    backdrop-filter: blur(20px) saturate(1.7);
+    border-top: 1px solid var(--docket-line);
+    box-shadow: none;
+    min-height: 64px;
+    padding-top: 7px;
   }
-  app-tabs ion-tab-button.tab-selected ion-icon {
-    background: var(--docket-selected);
-    border-radius: 9px;
-    padding: 4px 14px;
+  app-tabs ion-tab-button ion-icon {
+    font-size: 22px;
+    padding: 5px 18px;
+    border-radius: 12px;
+    background: transparent;
+    transition: background 160ms ease-out, color 160ms ease-out;
   }
+  app-tabs ion-tab-button.tab-selected ion-icon { background: var(--docket-selected); }
+  app-tabs ion-tab-button ion-label {
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 550;
+    letter-spacing: -0.005em;
+  }
+  app-tabs ion-tab-button.tab-selected ion-label { font-weight: 650; }
+}
+@media (prefers-reduced-motion: reduce) {
+  app-tabs ion-tab-button ion-icon { transition: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   ion-button::part(native), ion-fab-button::part(native) { transition: none; }
