@@ -35,6 +35,13 @@
   --docket-hover: #e5e5ea;
   --docket-line: #dedee3;
   --docket-radius: 14px;
+  /* Device insets as tokens: one place to read them, and a screen that turns
+     Ionic's own content padding off can still respect the notch, the Dynamic
+     Island and the home indicator. Zero on everything that has none. */
+  --docket-safe-top: env(safe-area-inset-top, 0px);
+  --docket-safe-right: env(safe-area-inset-right, 0px);
+  --docket-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --docket-safe-left: env(safe-area-inset-left, 0px);
   --viz-grid: #e8e8ed;
   --viz-axis: #c7c7cc;
   --viz-muted: #73737b;

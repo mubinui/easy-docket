@@ -1,6 +1,6 @@
 :host ion-content { --padding-start: 0; --padding-end: 0; --padding-bottom: 0; }
 .vault-layout { min-height: 100%; display: grid; grid-template-columns: 1fr 1fr; }
-.welcome-panel { background: var(--docket-sidebar); display: flex; flex-direction: column; padding: 48px 64px; min-height: 100vh; }
+.welcome-panel { background: var(--docket-sidebar); display: flex; flex-direction: column; padding: 48px 64px; min-height: 100dvh; }
 .wordmark { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 650; letter-spacing: -.025em; }
 .wordmark img { width: 34px; height: 34px; }
 .welcome-copy { margin-block: auto; padding: 64px 0; }
