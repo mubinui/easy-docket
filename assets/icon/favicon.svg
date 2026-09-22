@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Easy Docket">
+  <!--
+    The favicon, which is the same mark drawn for 16 and 32 pixels.
+    A browser tab is the one place this appears at a size where the three
+    entries of `icon.svg` close up into a grey smudge, so this variant fills
+    more of the canvas — no maskable safe zone is needed here — and carries two
+    thicker lines instead of three.
+  -->
+  <rect width="512" height="512" rx="96" fill="#0054e9"/>
+  <path fill="#ffffff"
+        d="M104 108a24 24 0 0 1 24-24h256a24 24 0 0 1 24 24v300l-40-30-40 30-40-30-40 30-40-30-40 30-40-30z"/>
+  <rect x="152" y="164" width="208" height="42" rx="21" fill="#0054e9"/>
+  <rect x="152" y="238" width="208" height="42" rx="21" fill="#0054e9"/>
+</svg>

@@ -1,0 +1,1 @@
+import {bn as E}from'./main-ZDNYMGJP.js';var r=class extends E{async canShare(){return typeof navigator>"u"||!navigator.share?{value:false}:{value:true}}async share(a){if(typeof navigator>"u"||!navigator.share)throw this.unavailable("Share API not available in this browser");return await navigator.share({title:a.title,text:a.text,url:a.url}),{}}};export{r as ShareWeb};

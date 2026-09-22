@@ -1,0 +1,1 @@
+import {X}from'./chunk-BnXJegvK.js';import {a$ as bw}from'./main-ZDNYMGJP.js';var m=(()=>{class t{transform(r,e="USD"){return X(r??0,e)}static{this.\u0275fac=function(e){return new(e||t)};}static{this.\u0275pipe=bw({name:"money",type:t,pure:true});}}return t})();export{m};

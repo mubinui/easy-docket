@@ -1,0 +1,1 @@
+import {bN as T}from'./main-ZDNYMGJP.js';var t=T("Share",{web:()=>import('./chunk-BP2HlrtW.js').then(r=>new r.ShareWeb)});export{t as Share};

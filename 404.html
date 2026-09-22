@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" data-beasties-container>
+
+<head>
+  <meta charset="utf-8">
+  <title>Easy Docket</title>
+
+  <base href="/easy-docket/">
+
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Offline-first personal money manager with end-to-end encrypted sync.">
+  <meta name="theme-color" content="#0054e9">
+  <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="msapplication-tap-highlight" content="no">
+
+  <!--
+    SVG first, for browsers that take it: one file, sharp at any size. The PNGs
+    are the fallback, and are a simplified drawing of the same mark — at 16px
+    the full icon's three entries close into a grey smudge.
+  -->
+  <link rel="icon" type="image/svg+xml" href="assets/icon/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icon/favicon-16x16.png">
+  <link rel="icon" type="image/png" href="assets/icon/favicon.png">
+
+  <!-- add to homescreen for ios -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Easy Docket">
+  <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+<style>:root{--ion-color-primary:#0054e9;--ion-color-primary-rgb:0, 84, 233;--ion-color-primary-contrast:#fff;--ion-color-primary-contrast-rgb:255, 255, 255;--ion-color-primary-shade:#004acd;--ion-color-primary-tint:#1a65eb;--ion-color-secondary:#0163aa;--ion-color-secondary-rgb:1, 99, 170;--ion-color-secondary-contrast:#fff;--ion-color-secondary-contrast-rgb:255, 255, 255;--ion-color-secondary-shade:#015796;--ion-color-secondary-tint:#1a73b3;--ion-color-tertiary:#6030ff;--ion-color-tertiary-rgb:96, 48, 255;--ion-color-tertiary-contrast:#fff;--ion-color-tertiary-contrast-rgb:255, 255, 255;--ion-color-tertiary-shade:#542ae0;--ion-color-tertiary-tint:#7045ff;--ion-color-success:#2dd55b;--ion-color-success-rgb:45, 213, 91;--ion-color-success-contrast:#000;--ion-color-success-contrast-rgb:0, 0, 0;--ion-color-success-shade:#28bb50;--ion-color-success-tint:#42d96b;--ion-color-warning:#ffc409;--ion-color-warning-rgb:255, 196, 9;--ion-color-warning-contrast:#000;--ion-color-warning-contrast-rgb:0, 0, 0;--ion-color-warning-shade:#e0ac08;--ion-color-warning-tint:#ffca22;--ion-color-danger:#c5000f;--ion-color-danger-rgb:197, 0, 15;--ion-color-danger-contrast:#fff;--ion-color-danger-contrast-rgb:255, 255, 255;--ion-color-danger-shade:#ad000d;--ion-color-danger-tint:#cb1a27;--ion-color-light:#f4f5f8;--ion-color-light-rgb:244, 245, 248;--ion-color-light-contrast:#000;--ion-color-light-contrast-rgb:0, 0, 0;--ion-color-light-shade:#d7d8da;--ion-color-light-tint:#f5f6f9;--ion-color-medium:#636469;--ion-color-medium-rgb:99, 100, 105;--ion-color-medium-contrast:#fff;--ion-color-medium-contrast-rgb:255, 255, 255;--ion-color-medium-shade:#57585c;--ion-color-medium-tint:#737478;--ion-color-dark:#222428;--ion-color-dark-rgb:34, 36, 40;--ion-color-dark-contrast:#fff;--ion-color-dark-contrast-rgb:255, 255, 255;--ion-color-dark-shade:#1e2023;--ion-color-dark-tint:#383a3e}html{--ion-dynamic-font:-apple-system-body;--ion-font-family:var(--ion-default-font)}body{background:var(--ion-background-color);color:var(--ion-text-color)}@supports (padding-top: 20px){html{--ion-safe-area-top:var(--ion-statusbar-padding)}}@supports (padding-top: env(safe-area-inset-top)){html{--ion-safe-area-top:var(--safe-area-inset-top, env(safe-area-inset-top));--ion-safe-area-bottom:var(--safe-area-inset-bottom, env(safe-area-inset-bottom));--ion-safe-area-left:var(--safe-area-inset-left, env(safe-area-inset-left));--ion-safe-area-right:var(--safe-area-inset-right, env(safe-area-inset-right))}}*{box-sizing:border-box;-webkit-tap-highlight-color:rgba(0,0,0,0);-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}html{width:100%;height:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%}body{-moz-osx-font-smoothing:grayscale;-webkit-font-smoothing:antialiased;margin:0;padding:0;position:fixed;width:100%;max-width:100%;height:100%;max-height:100%;transform:translateZ(0);text-rendering:optimizeLegibility;overflow:hidden;touch-action:manipulation;-webkit-user-drag:none;-ms-content-zooming:none;word-wrap:break-word;overscroll-behavior-y:none;-webkit-text-size-adjust:none;text-size-adjust:none}html{font-family:var(--ion-font-family)}@supports (-webkit-touch-callout: none){html{font:var(--ion-dynamic-font, 16px var(--ion-font-family))}}:root{--viz-surface:var(--ion-card-background, #ffffff);--viz-series-1:#2a78d6;--viz-series-2:#eb6834;--viz-grid:#e1e0d9;--viz-axis:#c3c2b7;--viz-muted:#898781;--viz-ink-secondary:#52514e}html{font-size:16px}body{-webkit-font-smoothing:antialiased}*{scrollbar-width:thin;scrollbar-color:var(--docket-line) transparent}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}:root{--ion-font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;--ion-color-primary:#0066cc;--ion-color-primary-rgb:0, 102, 204;--ion-color-primary-contrast:#ffffff;--ion-color-primary-shade:#005ab4;--ion-color-primary-tint:#1975d1;--ion-color-success:#23834b;--ion-color-success-rgb:35, 131, 75;--ion-color-success-contrast:#ffffff;--ion-color-success-shade:#1f7342;--ion-color-success-tint:#39905d;--ion-color-danger:#c13e37;--ion-color-danger-rgb:193, 62, 55;--ion-color-danger-contrast:#ffffff;--ion-color-danger-shade:#aa3730;--ion-color-danger-tint:#c7514b;--ion-color-medium:#6b6b73;--ion-color-medium-rgb:107, 107, 115;--ion-color-medium-contrast:#ffffff;--ion-color-medium-shade:#5e5e65;--ion-color-medium-tint:#7a7a81;--ion-background-color:#f5f5f7;--ion-background-color-rgb:245, 245, 247;--ion-text-color:#1d1d1f;--ion-text-color-rgb:29, 29, 31;--ion-card-background:#ffffff;--ion-item-background:#ffffff;--ion-toolbar-background:#f5f5f7;--ion-border-color:#e5e5e9;--docket-sidebar:#ececef;--docket-secondary:#686870;--docket-selected:#dce8f6;--docket-hover:#e5e5ea;--docket-line:#dedee3;--docket-radius:14px;--docket-safe-top:env(safe-area-inset-top, 0px);--docket-safe-right:env(safe-area-inset-right, 0px);--docket-safe-bottom:env(safe-area-inset-bottom, 0px);--docket-safe-left:env(safe-area-inset-left, 0px);--viz-grid:#e8e8ed;--viz-axis:#c7c7cc;--viz-muted:#73737b;--viz-ink-secondary:#686870}:root{--ion-background-color:#f0f2f6;--ion-background-color-rgb:240, 242, 246;--ion-toolbar-background:#f0f2f6;--docket-sidebar:#e8ecf2;--docket-radius:16px;--docket-elevation:0 1px 2px #25334b08, 0 6px 16px -10px #25334b1f;--docket-control-elevation:0 1px 2px #25334b0d, 0 3px 7px -4px #25334b26;--docket-surface-light:inset 0 1px 0 #ffffff99;--docket-glass:#f0f2f6e8;--docket-raised:#ffffff}</style><link rel="stylesheet" href="styles-5C7WLG4D.css" media="print" onload="this.media='all'"><noscript><link rel="stylesheet" href="styles-5C7WLG4D.css"></noscript></head>
+
+<body>
+  <app-root></app-root>
+  <noscript>Please enable JavaScript to continue using this application.</noscript>
+<script src="main-ZDNYMGJP.js" type="module"></script></body>
+
+</html>
